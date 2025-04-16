@@ -23,6 +23,7 @@ Installation
 
 How to contribute
 """""""""""""""""""""""""""
+
 The project has 2 main protected branches *main* that contains official software releases and *dev* that contains the latest feature implementations shared with developers.
 To implement a new feature a new branch should be created from the *dev* branch with name pattern of *developer_identifier/feature_name*.
 
@@ -44,7 +45,6 @@ If updating the docs web generated using sphinx, there might be a lot of changes
 
 License
 """"""""""""""""""
-
 This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze_torch/blob/master/LICENSE>`_ file in the root directory of this project.
 
 
@@ -56,8 +56,9 @@ This code was developed and originally published for the first time by (Mivalt 2
  |
  | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
+
 Seizure detection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+'''''''''''''''''''''''''''''''''''''''''''''''
  | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
 
