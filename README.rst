@@ -11,7 +11,7 @@ This project was originally developed as a part of the `BEhavioral STate Analysi
 Documentation
 """""""""""""""
 
-Documentation is available `here <https://bnelair.github.io/brainmaze_eeg>`_.
+Documentation is available `here <https://bnelair.github.io/brainmaze_torch>`_.
 
 
 Installation
