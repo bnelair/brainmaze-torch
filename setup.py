@@ -8,6 +8,8 @@ import os
 
 import setuptools
 
+from glob import glob
+
 
 NAME='brainmaze-torch'
 DESCRIPTION='BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch'
@@ -40,6 +42,24 @@ setuptools.setup(
 
     packages=setuptools.find_packages(exclude=["tests*"]),
     include_package_data=True,
+    package_data={
+        'brainmaze_torch': [
+            "brainmaze_torch/dbs/artifact_removal/_configs/*.yaml",
+            "brainmaze_torch/dbs/artifact_removal/_models/*.pt",
+            "brainmaze_torch/dbs/artifact_bank/*.mat",
+            "brainmaze_torch/seizure_detection/_models/*.pt"
+            "brainmaze_torch/signal_generation/DCGAN/_configs/*.yaml"
+            "brainmaze_torch/signal_generation/DCGAN/_models/*.pt"
+        ]
+    },
+    data_files=[
+        ('dbs_artifact_removal_cfg', glob('brainmaze_torch/dbs/artifact_removal/_configs/*.yaml')),
+        ('dbs_artifact_removal_mdl', glob('brainmaze_torch/dbs/artifact_removal/_models/*.pt')),
+        ('dbs_artifact_bank_artifact', glob('brainmaze_torch/dbs/artifact_bank/*.mat')),
+        ('seizure_detection', glob('brainmaze_torch/seizure_detection/_models/*.pt')),
+        ('signal_generation_cfg', glob('brainmaze_torch/signal_generation/DCGAN/_models/*.yaml')),
+        ('signal_generation_mdl', glob('brainmaze_torch/signal_generation/DCGAN/_models/*.pt')),
+    ],
 
     classifiers=[
         'Topic :: Scientific/Engineering :: Medical Science Apps.',

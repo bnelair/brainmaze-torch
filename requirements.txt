@@ -1,12 +1,13 @@
 
 setuptools>=61
 setuptools_scm
+pytest
 
 sphinx
 sphinx_book_theme
 
 brainmaze_utils
-pytest
+
 numpy
 pandas
 pytz
@@ -14,7 +15,14 @@ python-dateutil
 scikit-learn
 scipy
 tqdm
+matplotlib
 
+pyyaml
+torch
+torchvision
+torchaudio
+
+mef_tools
 
 
 
