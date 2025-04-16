@@ -15,6 +15,16 @@ TRAINED_MODELS = {'modelA': 'modelA_paper.pt', 'modelB': 'modelB_full.pt'}
 
 
 def load_trained_model(model_name):
+    """
+    Load a trained model from the specified path.
+    Two available trained models - 'modelA', 'modelB'
+    - modelA: the model from the published work.
+    - modelB: trained with extended training dataset.
+
+    :param model_name:
+    :type model_name: str
+    :return: pytorch_model
+    """
     if model_name in TRAINED_MODELS.keys():
         return _ModelsSeizureDetect.load_model(TRAINED_MODELS[model_name])
     else:
