@@ -11,7 +11,7 @@ This project was originally developed as a part of the `BEhavioral STate Analysi
 Documentation
 """""""""""""""
 
-Documentation is available `here <https://bnelair.github.io/brainmaze_eeg>`_.
+Documentation is available `here <https://bnelair.github.io/brainmaze_torch>`_.
 
 
 Installation
@@ -23,6 +23,7 @@ Installation
 
 How to contribute
 """""""""""""""""""""""""""
+
 The project has 2 main protected branches *main* that contains official software releases and *dev* that contains the latest feature implementations shared with developers.
 To implement a new feature a new branch should be created from the *dev* branch with name pattern of *developer_identifier/feature_name*.
 
@@ -44,7 +45,6 @@ If updating the docs web generated using sphinx, there might be a lot of changes
 
 License
 """"""""""""""""""
-
 This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze_torch/blob/master/LICENSE>`_ file in the root directory of this project.
 
 
@@ -56,13 +56,10 @@ This code was developed and originally published for the first time by (Mivalt 2
  |
  | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
-Seizure detection
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
-Artificial Signal Generation
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- | F. Mivalt et al., “Deep Generative Networks for Algorithm Development in Implantable Neural Technology,” in 2022 IEEE International Conference on Systems, Man, and Cybernetics (SMC), Oct. 2022, pp. 1736–1741, doi: 10.1109/SMC53654.2022.9945379.
+Seizure detection
+'''''''''''''''''''''''''''''''''''''''''''''''
+ | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
 
 Funding
