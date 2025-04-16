@@ -52,14 +52,6 @@ setuptools.setup(
             "brainmaze_torch/signal_generation/DCGAN/_models/*.pt"
         ]
     },
-    data_files=[
-        ('dbs_artifact_removal_cfg', glob('brainmaze_torch/dbs/artifact_removal/_configs/*.yaml')),
-        ('dbs_artifact_removal_mdl', glob('brainmaze_torch/dbs/artifact_removal/_models/*.pt')),
-        ('dbs_artifact_bank_artifact', glob('brainmaze_torch/dbs/artifact_bank/*.mat')),
-        ('seizure_detection', glob('brainmaze_torch/seizure_detection/_models/*.pt')),
-        ('signal_generation_cfg', glob('brainmaze_torch/signal_generation/DCGAN/_models/*.yaml')),
-        ('signal_generation_mdl', glob('brainmaze_torch/signal_generation/DCGAN/_models/*.pt')),
-    ],
 
     classifiers=[
         'Topic :: Scientific/Engineering :: Medical Science Apps.',
