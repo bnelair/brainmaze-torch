@@ -8,6 +8,8 @@ import os
 
 import setuptools
 
+from glob import glob
+
 
 NAME='brainmaze-torch'
 DESCRIPTION='BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch'
@@ -40,6 +42,11 @@ setuptools.setup(
 
     packages=setuptools.find_packages(exclude=["tests*"]),
     include_package_data=True,
+    package_data={
+        'brainmaze_torch': [
+            "brainmaze_torch/seizure_detection/_models/*.pt"
+        ]
+    },
 
     classifiers=[
         'Topic :: Scientific/Engineering :: Medical Science Apps.',
