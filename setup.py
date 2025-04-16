@@ -44,12 +44,7 @@ setuptools.setup(
     include_package_data=True,
     package_data={
         'brainmaze_torch': [
-            "brainmaze_torch/dbs/artifact_removal/_configs/*.yaml",
-            "brainmaze_torch/dbs/artifact_removal/_models/*.pt",
-            "brainmaze_torch/dbs/artifact_bank/*.mat",
             "brainmaze_torch/seizure_detection/_models/*.pt"
-            "brainmaze_torch/signal_generation/DCGAN/_configs/*.yaml"
-            "brainmaze_torch/signal_generation/DCGAN/_models/*.pt"
         ]
     },
 

@@ -60,10 +60,6 @@ Seizure detection
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
  | V. Sladky et al., “Distributed brain co-processor for tracking spikes, seizures and behaviour during electrical brain stimulation,” Brain Commun., vol. 4, no. 3, May 2022, doi: 10.1093/braincomms/fcac115.
 
-Artificial Signal Generation and DBS Artifact Removal for RCS
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
- | F. Mivalt et al., “Deep Generative Networks for Algorithm Development in Implantable Neural Technology,” in 2022 IEEE International Conference on Systems, Man, and Cybernetics (SMC), Oct. 2022, pp. 1736–1741, doi: 10.1109/SMC53654.2022.9945379.
-
 
 Funding
 """"""""""""""""""
