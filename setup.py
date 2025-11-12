@@ -66,5 +66,5 @@ setuptools.setup(
 
     # Dependencies and full metadata are declared in pyproject.toml.
     install_requires=[],
-    python_requires=">=3.10.0",
+    python_requires=">=3.9.0",
 )
