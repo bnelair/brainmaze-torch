@@ -34,13 +34,14 @@ The seizure detection and training of the model is described in add website.
 
 """
 
-from brainmaze_torch.seizure_detection._seizure_detect import infer_seizure_probability, preprocess_input
+from brainmaze_torch.seizure_detection._seizure_detect import infer_seizure_probability, preprocess_input, predict_channel_seizure_probability
 from brainmaze_torch.seizure_detection._models import load_trained_model
 
 __all__ = [
     'load_trained_model',
     'preprocess_input',
     'infer_seizure_probability',
+    'predict_channel_seizure_probability'
 ]
 
 

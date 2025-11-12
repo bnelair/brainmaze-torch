@@ -4,71 +4,67 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
+"""Minimal setup.py shim for legacy tooling.
+
+Primary metadata and dependencies live in pyproject.toml.
+This file exists so older pip/setuptools workflows that still
+invoke setup.py continue to work.
+"""
 
 import setuptools
+from pathlib import Path
 
-from glob import glob
-
-
-NAME='brainmaze-torch'
-DESCRIPTION='BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch'
-LONG_DESCRIPTION=open('README.rst', encoding='utf-8').read()
-EMAIL='mivalt.filip@mayo.edu'
-AUTHOR='Filip Mivalt'
-REQUIRES_PYTHON = '>=3.9.0'
-URL="https://github.com/bnelair/brainmaze_torch"
-PACKAGES = setuptools.find_packages()
-
-REQUIRED = []
-# if requirements___.txt exists, use it to populate the REQUIRED list
-if os.path.exists('requirements.txt'):
-    with open('requirements.txt') as f:
-        REQUIRED = f.read().splitlines()
-
+# Try to obtain the version from brainmaze_torch._version without requiring
+# setuptools_scm. This avoids importing the whole package when possible.
+_version = "0.0.0"
+try:
+    # preferred: import the module attribute
+    from importlib import import_module
+    _version = import_module("brainmaze_torch._version").__version__
+except Exception:
+    try:
+        # fallback: read and exec the _version.py file directly
+        version_file = Path(__file__).resolve().parent / "brainmaze_torch" / "_version.py"
+        about = {}
+        about_text = version_file.read_text(encoding="utf-8")
+        exec(about_text, about)
+        _version = about.get("__version__", _version)
+    except Exception:
+        # leave default version if everything fails
+        pass
 
 setuptools.setup(
-    name=NAME,
-    use_scm_version=True,
-    setup_requires=['setuptools>=61', 'setuptools_scm'],
-
-    description=DESCRIPTION,
-    author=AUTHOR,
-    author_email=EMAIL,
-    url=URL,
+    name="brainmaze-torch",
+    version=_version,
+    # no use_scm_version / no setuptools_scm required
+    description="BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch",
+    author="Filip Mivalt",
+    author_email="mivalt.filip@mayo.edu",
+    url="https://github.com/bnelair/brainmaze_torch",
     license="BSD-3-Clause",
-    long_description=LONG_DESCRIPTION,
-    long_description_content_type='text/x-rst',
 
-    packages=setuptools.find_packages(exclude=["tests*"]),
+    packages=setuptools.find_packages(exclude=["tests*", "examples*", "docs*", "docs_src*"]),
     include_package_data=True,
     package_data={
-        'brainmaze_torch': [
-            "brainmaze_torch/seizure_detection/_models/*.pt"
-        ]
+        "brainmaze_torch": ["seizure_detection/_models/*.pt"]
     },
 
     classifiers=[
-        'Topic :: Scientific/Engineering :: Medical Science Apps.',
+        "Topic :: Scientific/Engineering :: Medical Science Apps.",
         "Development Status :: 3 - Alpha",
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-
-        'Operating System :: OS Independent',
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.9",
+        "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
+        "Programming Language :: Python :: 3.12",
+        "Operating System :: OS Independent",
         "License :: OSI Approved :: BSD License",
-        'Intended Audience :: Healthcare Industry',
-        'Intended Audience :: Science/Research',
+        "Intended Audience :: Healthcare Industry",
+        "Intended Audience :: Science/Research",
     ],
-    python_requires=REQUIRES_PYTHON,
-    install_requires =REQUIRED,
+
+    # Dependencies and full metadata are declared in pyproject.toml.
+    install_requires=[],
+    python_requires=">=3.10.0",
 )
-
-
-
-
-
-
