@@ -27,13 +27,6 @@ dependencies = [
     "torchvision",
     "torchaudio",
 ]
-
-[project.optional-dependencies]
-test = [
-    "pytest~=8.4.2",
-    "pytest-order",
-]
-
 license = { text = "BSD-3-Clause" }
 classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
@@ -50,6 +43,12 @@ classifiers = [
     "Intended Audience :: Science/Research",
 ]
 urls = { "Homepage" = "https://github.com/bnelair/brainmaze_torch" }
+
+[project.optional-dependencies]
+test = [
+    "pytest~=8.4.2",
+    "pytest-order",
+]
 
 [tool.setuptools.dynamic]
 version = { attr = "brainmaze_torch._version.__version__" }
