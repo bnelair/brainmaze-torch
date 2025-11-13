@@ -115,7 +115,7 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
 
     if discard_edges_s == window_s:
         discard_edges_s = int((window_s/2) - 1)
-        warnings.warn("discard_edges_s should be equal to window_s, set to (window_s/2)-1")
+        warnings.warn("discard_edges_s should NOT be equal to window_s; set to (window_s/2)-1")
 
     edge = int(np.round(discard_edges_s * 2))
 
