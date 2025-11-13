@@ -10,7 +10,6 @@ import numpy as np
 from scipy.signal import spectrogram
 from scipy.stats import zscore
 from torch import from_numpy
-import math
 
 from brainmaze_torch.seizure_detection._models import load_trained_model
 from brainmaze_utils.signal import buffer
@@ -18,7 +17,7 @@ from brainmaze_utils.signal import buffer
 def preprocess_input(x, fs, return_axes=False):
     """
     This function will calculate a spectrogram. The spectrogram has shape [batch_size, 100, len(x) in seconds * 2 - 1]
-    :param x: raw data input in bach form [batch_size, n-samples]
+    :param x: raw data input in batch form [batch_size, n-samples]
     :type x: iterable
     :param fs: sampling rate of the input signal
     :return: batch of spectrograms from the input
@@ -116,7 +115,7 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
 
     if discard_edges_s == window_s:
         discard_edges_s = int((window_s/2) - 1)
-        warnings.warn("discard_edges_s should be equal to window_s, set to (window_s/2)-1")
+        warnings.warn("discard_edges_s should NOT be equal to window_s; set to (window_s/2)-1")
 
     edge = int(np.round(discard_edges_s * 2))
 
@@ -124,13 +123,11 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
     t = idx_arr / fs
 
     xb = buffer(x, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
-    idxb = buffer(idx_arr, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
     tb = buffer(t, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
 
     valid_buffer_windows = (tb == -1).sum(1) < tb.shape[1]
     xb = xb[valid_buffer_windows]
     tb = tb[valid_buffer_windows]
-    idxb = idxb[valid_buffer_windows]
 
     if isinstance(model, str):
         model = load_trained_model(model)
