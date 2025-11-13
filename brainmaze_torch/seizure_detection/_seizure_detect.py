@@ -123,13 +123,11 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
     t = idx_arr / fs
 
     xb = buffer(x, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
-    idxb = buffer(idx_arr, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
     tb = buffer(t, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
 
     valid_buffer_windows = (tb == -1).sum(1) < tb.shape[1]
     xb = xb[valid_buffer_windows]
     tb = tb[valid_buffer_windows]
-    idxb = idxb[valid_buffer_windows]
 
     prob = []
     for b in range(0, xb.shape[0], n_batch):
