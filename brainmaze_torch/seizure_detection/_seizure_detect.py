@@ -10,7 +10,6 @@ import numpy as np
 from scipy.signal import spectrogram
 from scipy.stats import zscore
 from torch import from_numpy
-import math
 
 from brainmaze_torch.seizure_detection._models import load_trained_model
 from brainmaze_utils.signal import buffer
