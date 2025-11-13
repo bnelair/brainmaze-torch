@@ -17,7 +17,7 @@ from brainmaze_utils.signal import buffer
 def preprocess_input(x, fs, return_axes=False):
     """
     This function will calculate a spectrogram. The spectrogram has shape [batch_size, 100, len(x) in seconds * 2 - 1]
-    :param x: raw data input in bach form [batch_size, n-samples]
+    :param x: raw data input in batch form [batch_size, n-samples]
     :type x: iterable
     :param fs: sampling rate of the input signal
     :return: batch of spectrograms from the input
