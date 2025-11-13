@@ -3,17 +3,9 @@ import pytest
 from pathlib import Path
 
 
-from unittest.mock import MagicMock
-
 import torch
 import numpy as np
 from scipy.io import savemat, loadmat
-from mef_tools import MefReader
-import matplotlib.pyplot as plt
-
-from numpy.testing import assert_allclose, assert_array_equal, assert_equal
-
-
 from brainmaze_torch.seizure_detection._seizure_detect import (
     infer_seizure_probability,
     predict_channel_seizure_probability,
