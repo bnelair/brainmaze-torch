@@ -132,11 +132,14 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
     tb = tb[valid_buffer_windows]
     idxb = idxb[valid_buffer_windows]
 
+    if isinstance(model, str):
+        model = load_trained_model(model)
+
     prob = []
     for b in range(0, xb.shape[0], n_batch):
         xb_ = xb[b:b+n_batch]
         txx, f, pxx = preprocess_input(xb_, fs, return_axes=True)
-        prob_ = infer_seizure_probability(pxx, load_trained_model(model), use_cuda=use_cuda, cuda_number=cuda_number)
+        prob_ = infer_seizure_probability(pxx, model, use_cuda=use_cuda, cuda_number=cuda_number)
         prob += [prob_]
 
     prob = np.concatenate(prob, 0)

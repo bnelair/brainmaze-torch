@@ -129,4 +129,17 @@ def test_process_data_over_multiple_batches():
     x = np.random.randn(dur_s*fs)
     txx_ref, prob = predict_channel_seizure_probability(x, fs, 'modelA', False, 1, window_s=10, step_s=1, n_batch=16, discard_edges_s=0.5)
 
+    assert txx_ref.shape[0]
+    assert prob.shape[0] == txx_ref.shape[0]
 
+
+
+def test_process_data_with_nans():
+    fs = 256
+    dur_s = 60
+    x = np.random.randn(dur_s*fs)
+    x[15*fs:45*fs] = np.nan
+
+    txx_ref, prob = predict_channel_seizure_probability(x, fs, 'modelA', False, 1, window_s=10, step_s=1, n_batch=16, discard_edges_s=0.5)
+
+    assert np.isnan(prob).sum() == 0
