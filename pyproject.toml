@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "brainmaze-torch"
+dynamic = ["version"]
+description = "BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch"
+authors = [
+    { name = "Filip Mivalt", email = "mivalt.filip@mayo.edu" }
+]
+readme = { file = "README.rst", content-type = "text/x-rst" }
+requires-python = ">=3.9.0"
+dependencies = [
+    "setuptools",
+    "sphinx",
+    "sphinx_book_theme",
+    "brainmaze_utils",
+    "pandas",
+    "pytz",
+    "python-dateutil",
+    "scikit-learn",
+    "tqdm",
+    "matplotlib",
+    "pyyaml",
+    "torch",
+    "torchvision",
+    "torchaudio",
+]
+license = { text = "BSD-3-Clause" }
+classifiers = [
+    "Topic :: Scientific/Engineering :: Medical Science Apps.",
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "License :: OSI Approved :: BSD License",
+    "Intended Audience :: Healthcare Industry",
+    "Intended Audience :: Science/Research",
+]
+urls = { "Homepage" = "https://github.com/bnelair/brainmaze_torch" }
+
+[project.optional-dependencies]
+test = [
+    "pytest~=8.4.2",
+    "pytest-order",
+]
+
+[tool.setuptools.dynamic]
+version = { attr = "brainmaze_torch._version.__version__" }
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = [
+    "tests",
+    "tests.*",
+    "examples",
+    "examples.*",
+    "docs",
+    "docs_src"
+]
+
+[tool.setuptools.package-data]
+"brainmaze_torch" = ["seizure_detection/_models/*.pt"]
+
+[tool.setuptools]
+include-package-data = true
