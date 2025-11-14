@@ -60,9 +60,15 @@ def infer_seizure_probability(x, model, use_cuda=False, cuda_number=0):
     x = x.float()
     if use_cuda:
         x = x.cuda(cuda_number)
+        model = model.cuda(cuda_number)
+    else:
+        x = x.cpu()
+        model = model.cpu()
+
+    model = model.eval()
 
     outputs, probs = model(x)
-    probs = probs[:, :, 3].data.cpu().numpy().flatten()
+    probs = probs[:, :, 3].data.detach().cpu().numpy().flatten()
     y = probs.reshape(x.shape[2], batch_size).T
     return y
 
@@ -161,3 +167,5 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
 
 
     return txx_ref, prob_realigned.max(0)
+
+
