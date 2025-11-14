@@ -167,5 +167,3 @@ def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, c
 
 
     return txx_ref, prob_realigned.max(0)
-
-
