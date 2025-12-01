@@ -1,4 +1,5 @@
 import pytest
+import warnings
 
 from pathlib import Path
 
@@ -143,3 +144,71 @@ def test_process_data_with_nans():
     txx_ref, prob = predict_channel_seizure_probability(x, fs, 'modelA', False, 1, window_s=10, step_s=1, n_batch=16, discard_edges_s=0.5)
 
     assert np.isnan(prob).sum() == 0
+
+
+def test_invalid_model_name():
+    """Test that an invalid model name raises KeyError."""
+    with pytest.raises(KeyError):
+        load_trained_model('invalid_model_name')
+
+
+def test_2d_input_raises_error():
+    """Test that 2D input to predict_channel_seizure_probability raises ValueError."""
+    fs = 256
+    dur_s = 60
+    x = np.random.randn(2, dur_s * fs)  # 2D array (multiple channels)
+
+    with pytest.raises(ValueError, match="single channel signal"):
+        predict_channel_seizure_probability(x, fs, 'modelA', False, 1)
+
+
+def test_discard_edges_equals_window_warns():
+    """Test that discard_edges_s == window_s produces a warning and auto-corrects."""
+    fs = 256
+    dur_s = 60
+    x = np.random.randn(dur_s * fs)
+
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter('always')
+        txx_ref, prob = predict_channel_seizure_probability(
+            x, fs, 'modelA', False, 1, window_s=10, step_s=1,
+            n_batch=16, discard_edges_s=10  # discard_edges_s == window_s
+        )
+        # Check that a warning was issued
+        assert len(w) >= 1
+        assert any("discard_edges_s" in str(warning.message) for warning in w)
+
+
+def test_preprocess_1d_input():
+    """Test that preprocess_input handles 1D input correctly by reshaping."""
+    fs = 256
+    dur_s = 10
+    x = np.random.randn(dur_s * fs)  # 1D array
+
+    xinp = preprocess_input(x, fs)
+    # Should be (1, 100, time_bins)
+    assert xinp.ndim == 3
+    assert xinp.shape[0] == 1
+    assert xinp.shape[1] == 100
+
+
+def test_preprocess_return_axes():
+    """Test that preprocess_input returns axes when requested."""
+    fs = 256
+    dur_s = 10
+    x = np.random.randn(1, dur_s * fs)
+
+    result = preprocess_input(x, fs, return_axes=True)
+    assert len(result) == 3  # (t, f, x)
+    t, f, xinp = result
+    assert len(t) > 0
+    assert len(f) == 100
+    assert xinp.ndim == 3
+
+
+def test_modelB_loads():
+    """Test that modelB can be loaded successfully."""
+    model = load_trained_model('modelB')
+    assert model is not None
+    # Model should be in eval mode
+    assert not model.training

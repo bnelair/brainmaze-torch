@@ -19,7 +19,7 @@ Installation
 
 .. code-block:: bash
 
-    pip install brainmaze-utils
+    pip install brainmaze-torch
 
 How to contribute
 """""""""""""""""""""""""""
