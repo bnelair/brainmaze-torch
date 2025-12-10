@@ -1,5 +1,6 @@
 .idea
 .idea/*
+/docs/
 /docs/.doctrees/
 /docs/_sources/
 **/.DS_Store
