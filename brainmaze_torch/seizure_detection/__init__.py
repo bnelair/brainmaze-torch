@@ -1,4 +1,3 @@
-
 """
 Seizure detection module
 available trained models - 'modelA', 'modelB'
@@ -6,27 +5,52 @@ modelA is the model from the published work.
 modelB had extended training dataset.
 Optimal input for the model is 300 second. It is recommended to use only middle part of the signal.
 
-Example
-............
+The module provides two main ways to get seizure probabilities:
+
+1.  **Low-level processing**: Use `preprocess_input` and `infer_seizure_probability` for batch processing of pre-windowed signals.
+2.  **High-level processing**: Use `predict_channel_seizure_probability` to get a continuous probability trace from a single long signal.
+
+Example (Low-level)
+...................
 
 .. code-block:: python
 
     from brainmaze_torch.seizure_detection import load_trained_model, preprocess_input, infer_seizure_probability
     from numpy.random import rand
+
     # load model
     modelA = load_trained_model('modelA')
+
     # load data
     fs = 500
     x_len = 300
     channels = 3
-    # create fake data
+
+    # create fake data for 3 channels, 300s long
     x_input = rand(channels, fs * x_len)
+
     # preprocess; from raw data to spectrogram
     x = preprocess_input(x_input, fs)
+
     # get seizure probability; model has 4 output classes, seizure probability is class 4.
     # output is in shape (batch_size, x_len * 2 - 1); probability value for every half-second
     y = infer_seizure_probability(x, modelA)
 
+Example (High-level for a single channel)
+.........................................
+
+.. code-block:: python
+
+    from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
+    from numpy.random import rand
+
+    # create fake data for a single channel, 10 minutes long
+    fs = 200
+    x_input = rand(fs * 600)
+
+    # get seizure probability over the entire signal
+    # this function handles windowing, preprocessing, and inference automatically
+    time_vector, probability_trace = predict_channel_seizure_probability(x_input, fs, model='modelA')
 
 
 Sources
