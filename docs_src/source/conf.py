@@ -25,13 +25,13 @@ print(projd)
 print(curwd)
 
 os.chdir(projd)
-from brainmaze_utils import __version__
+from brainmaze_torch import __version__
 os.chdir(curwd)
 
 # -- Project information -----------------------------------------------------
 
 # General information about the project.
-project = 'BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils'
+project = 'BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Torch'
 author = 'Filip Mivalt M.Sc., Ph.D.'
 copyright = '2020-present, Mayo Clinic Department of Neurology - Laboratory of Bioelectronics Neurophysiology and Engineering. All rights reserved'
 
@@ -147,7 +147,7 @@ html_theme_options = {
     # Toc options
     'collapse_navigation': False,
     'navigation_depth': 5,
-    "repository_url": "https://github.com/bnelair/brainmaze_utils",
+    "repository_url": "https://github.com/bnelair/brainmaze-torch",
     "use_repository_button": True,
     "home_page_in_toc": True
 }
@@ -158,14 +158,14 @@ html_theme_options = {
 
 # The name for this set of Sphinx documents.  If None, it defaults to
 # "<project> v<release> documentation".
-html_title = 'BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Utils'
+html_title = 'BrainMaze: A Toolbox to Analyze Brain Electrophysiology, Behavior and Dynamics - Torch'
 
 # A shorter title for the navigation bar.  Default is the same as html_title.
-html_short_title = 'BrainMaze: Utils'
+html_short_title = 'BrainMaze: Torch'
 
 # The name of an image file (relative to this directory) to place at the top
 # of the sidebar.
-html_logo = "../../img/brainmaze_1757x1762.png"
+html_logo = "../../img/brainmaze_1757x1762.PNG"
 
 # The name of an image file (within the static path) to use as favicon of the
 # docs.  This file should be a Windows icon file (.ico) being 16x16 or 32x32
@@ -250,7 +250,7 @@ latex_elements = {
 
 # The name of an image file (relative to this directory) to place at the top of
 # the title page.
-latex_logo = "../../img/brainmaze_1757x1762.png"
+latex_logo = "../../img/brainmaze_1757x1762.PNG"
 
 # For "manual" documents, if this is true, then toplevel headings are parts,
 # not chapters.
