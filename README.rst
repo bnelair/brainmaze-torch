@@ -64,11 +64,11 @@ After the feature is implemented, a pull request can be created to merge the fea
 Releasing
 '''''''''''''''''''''''''''''''
 
-Releases are automated and never bypass branch protection. To cut a release, a code owner runs the **Prepare release** GitHub Action (*Actions* tab, ``workflow_dispatch``) and selects the bump (*patch* / *minor* / *major*). This opens a small ``Release vX.Y.Z`` pull request that bumps ``[project].version`` in ``pyproject.toml`` on a ``release/bump-*`` branch off *main*. Once a code owner approves and merges that pull request into *main*, the **Release** workflow runs the tests, builds the distributions, publishes them to PyPI (Trusted Publishing), and then tags the version and creates the GitHub release. ``pyproject.toml`` is the single source of truth for the version.
+Releases are automated and never bypass branch protection. To cut a release, a code owner runs the **Prepare release** GitHub Action (*Actions* tab, ``workflow_dispatch``) and selects the bump (*patch* / *minor* / *major*). This opens a small ``Release vX.Y.Z`` pull request that bumps ``[project].version`` in ``pyproject.toml`` on a ``release/bump-*`` branch off *main*. Once a code owner approves and merges that pull request into *main*, the **Release** workflow runs the tests, builds the distributions, publishes them to PyPI (org API token ``PYPI_Token_General``), and then tags the version and creates the GitHub release. ``pyproject.toml`` is the single source of truth for the version.
 
 Promotion of features from *dev* to *main* is independent of releases and **must not change** ``[project].version``: a *Version guard* CI check fails any pull request outside the release flow that edits it.
 
-See `RELEASING.md <RELEASING.md>`_ for the step-by-step guide and the one-time setup (PyPI Trusted Publisher, Actions permission to open pull requests).
+See `RELEASING.md <RELEASING.md>`_ for the step-by-step guide and publishing credentials and recovery.
 
 Building the documentation
 '''''''''''''''''''''''''''''''

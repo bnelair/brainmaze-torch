@@ -5,19 +5,18 @@ name: Release
 # feature merges leave the version unchanged and no-op.
 #
 # The shared reusable workflow does guard + test + build (and uploads the `dist` artifact).
-# Publishing to PyPI happens HERE, in this repo's own top-level workflow, because PyPI
-# Trusted Publishing does not support publishing from a reusable workflow -- the OIDC
-# identity must be this repo's release.yml for the trusted publisher to match. The tag and
-# GitHub Release are created only after a successful PyPI upload, so a failed publish leaves
-# nothing to clean up (the guard simply retries next run).
+# Publishing to PyPI happens HERE, in this repo's own top-level job, using the org-level API
+# token secret PYPI_Token_General (maintainer decision; brainmaze-eeg/-utils use Trusted
+# Publishing instead -- switching is optional, see RELEASING.md). The tag and GitHub Release
+# are created only after a successful PyPI upload. If the publish fails, nothing is tagged;
+# see RELEASING.md for recovery (a later push to main would release THAT commit instead).
 
 on:
   push:
     branches: [main]
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read           # least privilege for the reusable build job; publish raises its own
 
 jobs:
   build:
@@ -29,7 +28,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write      # push the tag + create the GitHub Release
-      id-token: write      # PyPI Trusted Publishing (OIDC) -- matched against THIS repo
     steps:
       - name: Download built distributions
         uses: actions/download-artifact@v4
@@ -37,8 +35,19 @@ jobs:
           name: dist
           path: dist
 
-      - name: Publish to PyPI (Trusted Publishing)
+      - name: Check PyPI token is available
+        env:
+          TOKEN: ${{ secrets.PYPI_Token_General }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::Secret PYPI_Token_General is not available to this repository (org secret missing or not shared with brainmaze-torch). Nothing was published or tagged."
+            exit 1
+          fi
+
+      - name: Publish to PyPI (org API token)
         uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_Token_General }}
 
       - uses: actions/checkout@v4
         with:
