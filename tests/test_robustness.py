@@ -138,14 +138,44 @@ def test_gap_never_reported_as_zero_probability(model):
     assert np.all(np.isfinite(p[(t > 0) & ~gap]))
 
 
-def test_window_below_min_valid_fraction_is_nan(model):
+@pytest.mark.parametrize("mvf", [0.0, 0.5, 0.9, 1.0])
+@pytest.mark.parametrize("gap", [(0, 25), (5, 25), (35, 55), (40, 60)])
+def test_min_valid_fraction_never_nans_valid_data(model, mvf, gap):
+    # long gaps next to the recording edges: no window there has mostly valid data,
+    # yet every valid segment must still get a value (review R2)
     rng = np.random.default_rng(7)
-    x = rng.standard_normal(30 * FS)
-    x[: 25 * FS] = np.nan   # the only evaluable windows are mostly gap
-    _, p_strict = predict_channel_seizure_probability(x, FS, model, min_valid_fraction=0.9, **KW)
-    assert np.all(np.isnan(p_strict))
-    _, p_loose = predict_channel_seizure_probability(x, FS, model, min_valid_fraction=0.0, **KW)
-    assert np.isfinite(p_loose).sum() > 0
+    x = rng.standard_normal(60 * FS)
+    x[gap[0] * FS:gap[1] * FS] = np.nan
+    _, p = predict_channel_seizure_probability(x, FS, model, min_valid_fraction=mvf, **KW)
+    np.testing.assert_array_equal(np.where(np.isnan(p))[0], _expected_nan_idx(x, p.size))
+
+
+def test_min_valid_fraction_default_is_published_method(model):
+    rng = np.random.default_rng(9)
+    x = rng.standard_normal(60 * FS)
+    x[30 * FS:50 * FS] = np.nan
+    _, p_def = predict_channel_seizure_probability(x, FS, model, **KW)
+    _, p_0 = predict_channel_seizure_probability(x, FS, model, min_valid_fraction=0.0, **KW)
+    np.testing.assert_array_equal(p_def, p_0)
+    # a preference > 0 may only change values, never the NaN set
+    _, p_pref = predict_channel_seizure_probability(x, FS, model, min_valid_fraction=0.9, **KW)
+    np.testing.assert_array_equal(np.isnan(p_pref), np.isnan(p_0))
+
+
+def test_tail_window_never_changes_regular_values(model):
+    # the extra end-aligned window may only fill time no regular window covers (review R1):
+    # a recording that ends off the step grid gives the same values as the same signal
+    # cut back onto the grid, wherever the latter has regular-window coverage
+    rng = np.random.default_rng(10)
+    x = rng.standard_normal(80 * FS)
+    kw = dict(window_s=10, step_s=4, discard_edges_s=0.5, n_batch=16)
+    _, p_on = predict_channel_seizure_probability(x[:74 * FS], FS, model, fill_recording_edges=False, **kw)
+    _, p_off = predict_channel_seizure_probability(x[:77 * FS + 50], FS, model, **kw)
+    covered = np.isfinite(p_on)
+    assert covered.sum() > 100
+    # same regular windows; batch composition differs -> float tolerance
+    np.testing.assert_allclose(p_off[:p_on.size][covered], p_on[covered], rtol=0, atol=ATOL)
+    assert np.all(np.isfinite(p_off[1:]))
 
 
 def test_all_nan_input_is_all_nan(model):

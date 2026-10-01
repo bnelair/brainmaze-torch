@@ -260,16 +260,22 @@ def infer_seizure_probability(x, model, use_cuda=False, cuda_number=0):
 def predict_channel_seizure_probability(
         x, fs, model='modelA', use_cuda=False, cuda_number=0, n_batch=128,
         window_s=300, step_s=20, discard_edges_s=10,
-        min_valid_fraction=0.5, fill_recording_edges=True,
+        min_valid_fraction=0.0, fill_recording_edges=True,
 ):
     """Continuous seizure-probability trace for one (long) iEEG channel.
 
     The signal is cut into overlapping windows of ``window_s`` seconds every
-    ``step_s`` seconds, plus one extra window aligned to the end of the
-    recording so the tail is always covered. Each window is converted to a
-    spectrogram and run through the model; ``discard_edges_s`` seconds are
-    dropped at both window edges (the BiLSTM has little context there), and
-    overlapping windows are combined with a NaN-ignoring maximum.
+    ``step_s`` seconds (the "regular" windows of the published method). Each
+    window is converted to a spectrogram and run through the model;
+    ``discard_edges_s`` seconds are dropped at both window edges (the BiLSTM
+    has little context there), and overlapping windows are combined with a
+    NaN-ignoring maximum. If the recording end does not fall on the step
+    grid, one extra window aligned to the recording end covers the tail; it
+    only fills time that no regular window covers and never changes a value
+    produced by the regular windows. With the default parameters the output
+    is therefore identical to the published method (brainmaze-torch <= 0.1.1)
+    wherever that method produced an estimate, except that invalid (gap /
+    flat) segments are NaN instead of a number.
 
     Parameters
     ----------
@@ -303,9 +309,15 @@ def predict_channel_seizure_probability(
         Seconds dropped at each window edge; multiple of 0.5, may be 0.
         Default 10.
     min_valid_fraction : float, optional
-        A window is evaluated only if at least this fraction of its 1 s
-        segments (spectrogram columns) are valid, i.e. contain only finite
-        samples and are not flat; otherwise it contributes NaN. Default 0.5.
+        Window preference near gaps. A window is *preferred* if at least this
+        fraction of its 1 s segments (spectrogram columns) are valid (finite
+        samples, not flat). A valid segment gets the maximum over the
+        preferred windows covering it; only if none of them covers it, the
+        maximum over all windows covering it is used. This never turns a valid
+        segment into NaN; it only lets gap-heavy (mostly zero-filled) windows
+        be ignored where a better window exists. Default 0.0: every window is
+        preferred, i.e. the published method. Values > 0 change probabilities
+        next to long gaps compared with the published method (not validated).
     fill_recording_edges : bool, optional
         The first and last ``discard_edges_s`` seconds of the *recording*
         lie in no window's kept interior. If True (default), they are taken
@@ -327,13 +339,13 @@ def predict_channel_seizure_probability(
         * every 1 s segment containing at least one NaN/inf sample (gaps),
         * every 1 s segment over which the signal is constant (flat line,
           e.g. disconnected or saturated channel),
-        * segments covered only by windows with fewer than
-          ``min_valid_fraction`` valid segments,
         * the first/last ``discard_edges_s`` s if ``fill_recording_edges`` is
           False.
 
         NaN therefore always means "not evaluated", never "no seizure"; a
-        value is never 0 merely because a time point was not covered.
+        value is never 0 merely because a time point was not covered. Every
+        other (valid) segment always gets a value, whatever
+        ``min_valid_fraction`` is.
 
     Raises
     ------
@@ -348,7 +360,8 @@ def predict_channel_seizure_probability(
       which can influence the probability of valid segments next to a gap via
       the BiLSTM context; only the gap segments themselves are masked to NaN.
       To fill short gaps instead (e.g. by interpolation), do so before calling
-      this function; filled samples are then treated as valid data.
+      this function; filled samples are then treated as valid data. See
+      ``min_valid_fraction`` to ignore mostly-gap windows where possible.
     * Probabilities of overlapping windows are combined with a NaN-ignoring
       maximum (``np.fmax``), as in the published method.
 
@@ -412,39 +425,63 @@ def predict_channel_seizure_probability(
         & (np.fmax(blk_max[:-1], blk_max[1:]) > np.fmin(blk_min[:-1], blk_min[1:]))
     )
 
-    # ---- window starts in half-second blocks; always one ending at the recording end
+    # ---- window starts in half-second blocks ---------------------------
+    # Regular windows start every step_s (exactly the windows of the published
+    # method). If the recording end is not on that grid, one extra "tail" window
+    # aligned to the recording end is added; it is only used to fill time that no
+    # regular window covers, so it never changes a value the regular windows give.
     last_start = (n - w) // hop
-    starts = np.arange(0, last_start + 1, s2)
-    if starts[-1] != last_start:
-        starts = np.append(starts, last_start)
+    reg_starts = np.arange(0, last_start + 1, s2)
+    has_tail = reg_starts[-1] != last_start
+    starts = np.append(reg_starts, last_start) if has_tail else reg_starts
+    is_tail = np.zeros(starts.size, dtype=bool)
+    is_tail[-1] = has_tail
 
+    # Output slice of every window: its kept (non-discarded) columns.
+    lo_arr = np.where(fill_recording_edges & (starts == 0), 0, e2)
+    hi_arr = np.where(fill_recording_edges & (starts == last_start), n_cols, n_cols - e2)
     frac_valid = np.array([seg_valid[b0 + 1:b0 + 1 + n_cols].mean() for b0 in starts])
-    starts_eval = starts[frac_valid >= float(min_valid_fraction)]
+    # A window whose kept part holds no valid segment can only contribute NaN: skip it.
+    useful = np.array([seg_valid[b0 + 1 + lo:b0 + 1 + hi].any()
+                       for b0, lo, hi in zip(starts, lo_arr, hi_arr)])
+    preferred = frac_valid >= float(min_valid_fraction)
 
     t_out = np.arange(n_out) * 0.5
-    prob_out = np.full(n_out, np.nan)
-    if starts_eval.size == 0:
-        return t_out, prob_out
+    prob_pref = np.full(n_out, np.nan)   # max over regular windows with enough valid data
+    prob_all = np.full(n_out, np.nan)    # max over all regular windows
+    prob_tail = np.full(n_out, np.nan)   # tail window
+    sel = np.flatnonzero(useful)
+    if sel.size == 0:
+        return t_out, prob_pref
 
     if isinstance(model, str):
         model = load_trained_model(model)
 
     device = torch.device(f"cuda:{cuda_number}") if use_cuda else torch.device("cpu")
     with _model_on_device_eval(model, device):
-        for b in range(0, starts_eval.size, n_batch):
-            batch_starts = starts_eval[b:b + n_batch]
-            xb = np.stack([x[b0 * hop:b0 * hop + w] for b0 in batch_starts])
+        for b in range(0, sel.size, n_batch):
+            batch = sel[b:b + n_batch]
+            xb = np.stack([x[starts[i] * hop:starts[i] * hop + w] for i in batch])
             pxx = preprocess_input(xb, fs)
             prob = infer_seizure_probability(pxx, model, use_cuda=use_cuda, cuda_number=cuda_number)
             if prob.shape[1] != n_cols:  # pragma: no cover - internal consistency check
                 raise RuntimeError(f"unexpected number of model outputs {prob.shape[1]} != {n_cols}")
 
-            for b0, p in zip(batch_starts, prob):
-                lo = 0 if (fill_recording_edges and b0 == 0) else e2
-                hi = n_cols if (fill_recording_edges and b0 == last_start) else n_cols - e2
+            for i, p in zip(batch, prob):
+                b0, lo, hi = starts[i], lo_arr[i], hi_arr[i]
                 idx = slice(b0 + 1 + lo, b0 + 1 + hi)
                 p = p[lo:hi].astype(np.float64)
                 p[~seg_valid[idx]] = np.nan
-                prob_out[idx] = np.fmax(prob_out[idx], p)
+                if is_tail[i]:
+                    prob_tail[idx] = p
+                    continue
+                prob_all[idx] = np.fmax(prob_all[idx], p)
+                if preferred[i]:
+                    prob_pref[idx] = np.fmax(prob_pref[idx], p)
 
+    # Priority: preferred regular windows > any regular window > tail window.
+    # With min_valid_fraction=0 every regular window is preferred, so the result
+    # equals the published method wherever a regular window's kept part lies.
+    prob_out = np.where(np.isnan(prob_pref), prob_all, prob_pref)
+    prob_out = np.where(np.isnan(prob_out), prob_tail, prob_out)
     return t_out, prob_out
