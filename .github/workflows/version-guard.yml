@@ -1,0 +1,42 @@
+name: Version guard
+
+# Enforces that [project].version is only ever changed by the release flow. The exemption
+# requires all three signals of a genuine release bump -- opened by github-actions[bot],
+# from a release/bump-* branch, targeting main -- so a hand-named branch cannot slip a
+# version edit past the check. This keeps the version line owned solely by the release
+# automation on main and therefore keeps dev -> main merges free of version conflicts
+# under squash merges.
+
+on:
+  pull_request:
+    branches: [main, dev]
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Reject version edits outside the release flow
+        shell: bash
+        # PR-controlled values (branch name, login) go through env, never inline into the
+        # script, so a crafted branch name cannot inject shell commands.
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          set -euo pipefail
+          if [[ "$BASE_REF" == "main" \
+                && "$HEAD_REF" == release/bump-* \
+                && "$PR_AUTHOR" == "github-actions[bot]" ]]; then
+            echo "Automated release bump PR -- version change allowed."
+            exit 0
+          fi
+          if git diff "$BASE_SHA" HEAD -- pyproject.toml | grep -qE '^[+-][[:space:]]*version[[:space:]]*='; then
+            echo "::error::This PR changes [project].version in pyproject.toml. The version is owned by the release automation on main -- use the 'Prepare release' action instead. See the README 'How to contribute' section."
+            exit 1
+          fi
+          echo "No version change -- OK."
