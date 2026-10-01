@@ -4,34 +4,49 @@
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
 
-import os
-from brainmaze_utils.files import get_files
+from pathlib import Path
+
 from torch import load, nn, zeros, unsqueeze, squeeze
 import torch.nn.functional as F
 
-DELIMITER = os.sep
+_MODEL_DIR = Path(__file__).resolve().parent
 
 TRAINED_MODELS = {'modelA': 'modelA_paper.pt', 'modelB': 'modelB_full.pt'}
 
 
 def load_trained_model(model_name):
-    """
-    Load a trained model from the specified path.
-    Two available trained models - 'modelA', 'modelB'
-    - modelA: the model from the published work.
-    - modelB: trained with extended training dataset.
+    """Load one of the bundled, pre-trained seizure-detection models.
 
-    :param model_name:
-    :type model_name: str
-    :return: pytorch_model
+    Parameters
+    ----------
+    model_name : {'modelA', 'modelB'}
+        ``'modelA'``: the model from the published work (Sladky et al. 2022).
+        ``'modelB'``: the same architecture trained on an extended data set.
+
+    Returns
+    -------
+    SeizureDetectModel
+        A ``torch.nn.Module`` on the CPU, in eval mode, with the weights loaded
+        strictly (every parameter must match).
+
+    Raises
+    ------
+    KeyError
+        If ``model_name`` is not one of the bundled models.
     """
-    if model_name in TRAINED_MODELS.keys():
-        return _ModelsSeizureDetect.load_model(TRAINED_MODELS[model_name])
-    else:
-        raise KeyError(f"unknown trained model {model_name}; available {TRAINED_MODELS.keys()}")
+    if model_name not in TRAINED_MODELS:
+        raise KeyError(f"unknown trained model {model_name!r}; available {list(TRAINED_MODELS)}")
+    return _ModelsSeizureDetect.load_model(model_name)
 
 
 class SeizureDetectModel(nn.Module):
+    """CNN + 2-layer bidirectional LSTM seizure classifier (Sladky et al. 2022).
+
+    Input: spectrograms of shape ``(batch_size, 100, n_times)`` (see
+    :func:`~brainmaze_torch.seizure_detection.preprocess_input`).
+    ``forward`` returns ``(logits, probabilities)``, both of shape
+    ``(n_times, batch_size, 4)``; class index 3 is "seizure".
+    """
 
     def __init__(self):
         super().__init__()
@@ -63,44 +78,13 @@ class SeizureDetectModel(nn.Module):
         return x, F.softmax(x, dim=2)
 
 
-class _ModelsSeizureDetect(dict):
-    _keys = dict([
-        (
-            '_'.join(f.split(DELIMITER)[-1].split('_')[:2]),
-            f
-        )
-        for f in get_files(DELIMITER.join(__file__.split(DELIMITER)[:-1]), 'pt')
-        if not '.-' in f.split(DELIMITER)[-1]
-    ])
+class _ModelsSeizureDetect:
+    """Loader for the bundled ``.pt`` state dicts (keyed by model name)."""
 
-    def keys(self):
-        return self._keys.keys()
-
-    def get_model(self, item):
-        f = self._keys[item]
-        state_dict = load(f, map_location='cpu')
+    @staticmethod
+    def load_model(model_name):
+        state_dict = load(_MODEL_DIR / TRAINED_MODELS[model_name], map_location='cpu')
         mod = SeizureDetectModel()
         mod.load_state_dict(state_dict, strict=True)
         mod.eval()
         return mod
-
-    @classmethod
-    def load_model(cls, model_name):
-        f = cls._keys[model_name]
-        state_dict = load(f, map_location='cpu')
-        mod = SeizureDetectModel()
-        mod.load_state_dict(state_dict, strict=True)
-        mod.eval()
-        return mod
-
-    def __getitem__(self, item):
-        return self.get_model(item)
-
-    def __call__(self, item):
-        return self[item]
-
-    def __str__(self):
-        return 'models ' + str(self._keys.keys())
-
-    def __repr__(self):
-        return self.__str__()

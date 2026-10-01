@@ -3,167 +3,448 @@
 #
 # This source code is licensed under the license found in the
 # LICENSE file in the root directory of this source tree.
-import warnings
+"""Seizure-probability inference (spectrogram CNN + BiLSTM) for iEEG signals.
 
-import matplotlib.pyplot as plt
+Time grid convention used throughout this module
+------------------------------------------------
+The model consumes spectrograms computed with 1 s segments (``nperseg = fs``)
+advanced by 0.5 s (``hop = fs // 2``), keeping the first 100 frequency bins
+(0-99 Hz at 1 Hz resolution). Every spectrogram column -- and therefore every
+probability value -- describes the 1 s of signal *centred* on its time stamp.
+For a signal (or window) starting at sample 0, column ``j`` covers samples
+``[j * hop, j * hop + fs)`` and is stamped ``(j + 1) * 0.5`` s.
+"""
+import warnings
+from contextlib import contextmanager
+
 import numpy as np
+import torch
 from scipy.signal import spectrogram
-from scipy.stats import zscore
-from torch import from_numpy
 
 from brainmaze_torch.seizure_detection._models import load_trained_model
-from brainmaze_utils.signal import buffer
 
+#: Number of spectrogram frequency bins (1 Hz each, 0..99 Hz) the model expects.
+N_FREQ_BINS = 100
+#: Minimum supported sampling rate in Hz (needs >= 100 one-Hz bins below Nyquist).
+MIN_FS = 200
+#: Index of the seizure class in the model's 4-class softmax output.
+SEIZURE_CLASS_INDEX = 3
+
+
+# --------------------------------------------------------------------------- #
+# validation helpers
+# --------------------------------------------------------------------------- #
+def _validate_fs(fs):
+    """Return ``fs`` as an ``int`` or raise ``ValueError``.
+
+    ``fs`` must be a whole, even number of Hz and at least :data:`MIN_FS`.
+    Float values that are whole numbers (e.g. ``500.0`` read from a .mat or
+    MEF header) are accepted and cast to ``int``.
+    """
+    if isinstance(fs, (bool, np.bool_)):
+        raise ValueError(f"fs must be a number of Hz, got {fs!r}")
+    try:
+        fs_f = float(fs)
+    except (TypeError, ValueError):
+        raise ValueError(f"fs must be a number of Hz, got {fs!r}") from None
+    if not np.isfinite(fs_f) or not fs_f.is_integer():
+        raise ValueError(
+            f"fs must be a whole number of Hz, got {fs!r}. The model works on a 1 Hz / 0.5 s "
+            "spectrogram grid that requires an integer number of samples per second; resample "
+            "the signal to an integer rate (e.g. with scipy.signal.resample_poly) first."
+        )
+    fs_i = int(fs_f)
+    if fs_i < MIN_FS:
+        raise ValueError(
+            f"fs must be >= {MIN_FS} Hz, got {fs!r}. The model needs {N_FREQ_BINS} spectrogram "
+            f"bins (0-{N_FREQ_BINS - 1} Hz at 1 Hz resolution), i.e. a Nyquist frequency of at "
+            "least 100 Hz."
+        )
+    if fs_i % 2:
+        raise ValueError(
+            f"fs must be an even number of Hz, got {fs_i}. With an odd rate the 0.5 s spectrogram "
+            "hop (fs/2 samples) is not an integer number of samples, so the output would drift off "
+            "the 0.5 s grid the model was trained on. Resample to an even rate first, e.g. "
+            "scipy.signal.resample_poly(x, up=2, down=1) or to a standard rate such as 500 Hz."
+        )
+    return fs_i
+
+
+def _to_half_seconds(value, name, minimum):
+    """Convert a duration in seconds to an integer count of 0.5 s steps."""
+    try:
+        v2 = float(value) * 2.0
+    except (TypeError, ValueError):
+        raise ValueError(f"{name} must be a number of seconds, got {value!r}") from None
+    if not np.isfinite(v2) or abs(v2 - round(v2)) > 1e-9:
+        raise ValueError(f"{name} must be a multiple of 0.5 s (the model's time step), got {value!r}")
+    v2 = int(round(v2))
+    if v2 < minimum:
+        raise ValueError(f"{name} must be >= {minimum / 2} s, got {value!r}")
+    return v2
+
+
+@contextmanager
+def _model_on_device_eval(model, device):
+    """Temporarily move ``model`` to ``device`` in eval mode; restore both afterwards.
+
+    The caller's model object is never left on a different device or in a
+    different train/eval mode than it was passed in.
+    """
+    params = list(model.parameters())
+    orig_device = params[0].device if params else None
+    was_training = model.training
+    moved = orig_device is not None and orig_device != device
+    try:
+        if moved:
+            model.to(device)
+        model.eval()
+        yield model
+    finally:
+        model.train(was_training)
+        if moved:
+            model.to(orig_device)
+
+
+# --------------------------------------------------------------------------- #
+# public API
+# --------------------------------------------------------------------------- #
 def preprocess_input(x, fs, return_axes=False):
-    """
-    This function will calculate a spectrogram. The spectrogram has shape [batch_size, 100, len(x) in seconds * 2 - 1]
-    :param x: raw data input in batch form [batch_size, n-samples]
-    :type x: iterable
-    :param fs: sampling rate of the input signal
-    :return: batch of spectrograms from the input
-    :rtype: np.array
-    """
-    x = np.array(x)
+    """Convert raw signal windows into normalised spectrograms for the model.
 
+    Each row of ``x`` is processed independently:
+
+    1. z-score the raw signal (NaN-aware mean/std over the row; a row with zero
+       or undefined std is only mean-centred, never divided by 0),
+    2. replace NaN / +-inf samples by 0,
+    3. spectrogram with ``nperseg = fs`` (1 s, 1 Hz bins) and a 0.5 s hop
+       (``noverlap = fs // 2``), keeping the first 100 bins (0-99 Hz),
+    4. z-score every frequency bin over time, using only columns with non-zero
+       total power. Columns with zero power (e.g. a flat or zero-filled gap) are
+       left at 0. If a bin has zero variance, or fewer than two columns have
+       power, that bin is only mean-centred (no division by 0).
+
+    Parameters
+    ----------
+    x : array_like, shape (n_samples,) or (batch_size, n_samples)
+        Raw signal. A 1D input is treated as a single window. Rows are windows
+        (or channels), columns are samples. Must contain at least ``fs``
+        samples (1 s).
+    fs : int or float
+        Sampling rate in Hz. Must be a whole, even number >= 200; a float such
+        as ``500.0`` is accepted. Odd or fractional rates raise ``ValueError``
+        -- resample first (see Notes).
+    return_axes : bool, optional
+        If True, also return the time and frequency axes. Default False.
+
+    Returns
+    -------
+    t : numpy.ndarray, shape (n_times,)
+        Only if ``return_axes``. Time stamp in seconds of every column,
+        relative to the first sample of the window: ``(j + 1) * 0.5`` -- the
+        centre of the 1 s segment ``[j * 0.5, j * 0.5 + 1)``.
+    f : numpy.ndarray, shape (100,)
+        Only if ``return_axes``. Frequencies in Hz (0, 1, ..., 99).
+    sxx : numpy.ndarray, shape (batch_size, 100, n_times)
+        Normalised spectrograms, ``n_times = floor((n_samples - fs) / (fs // 2)) + 1``
+        (= ``2 * duration_s - 1`` for whole-second inputs). Always finite.
+
+    Raises
+    ------
+    ValueError
+        If ``fs`` is invalid, ``x`` is not 1D/2D, or shorter than 1 s.
+
+    Notes
+    -----
+    NaN samples are zero-filled *before* the spectrogram, so the model still
+    sees a value there. This low-level function does not mark such columns;
+    use :func:`predict_channel_seizure_probability`, which reports any 1 s
+    segment containing NaN/inf (or a flat signal) as NaN in its output.
+
+    Odd sampling rates are rejected instead of being silently handled because
+    a hop of ``fs/2`` samples would not be an integer and the output would
+    drift off the 0.5 s grid the model was trained on.
+    """
+    fs = _validate_fs(fs)
+    x = np.array(x, dtype=np.float64)  # always a copy; never modifies caller data
     if x.ndim == 1:
         x = x.reshape((1, -1))
+    if x.ndim != 2:
+        raise ValueError(f"x must be 1D (n_samples,) or 2D (batch_size, n_samples), got shape {x.shape}")
+    if x.shape[1] < fs:
+        raise ValueError(f"x must contain at least fs={fs} samples (1 s), got {x.shape[1]}")
 
-    ii, jj = x.shape
-    mu = np.nanmean(x, axis=1)
-    std = np.nanstd(x, axis=1)
-    x = (x - mu.reshape((ii, 1))) / std.reshape((ii, 1))
-    x = np.nan_to_num(x)
-    f, t, x = spectrogram(x, fs, nperseg=fs, noverlap=fs / 2, axis=1)
-    x2 = x[:, :100, :]
-    x = np.empty(x2.shape)
-    for kk, xx in enumerate(x2):
-        idx = np.sum(xx, axis=0) == 0
-        xx[:, ~idx] = zscore(xx[:, ~idx], axis=1)
-        x[kk, :, :] = xx
+    hop = fs // 2
+    x[~np.isfinite(x)] = np.nan
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)  # all-NaN rows / ddof warnings
+        mu = np.nanmean(x, axis=1, keepdims=True)
+        std = np.nanstd(x, axis=1, keepdims=True)
+    mu = np.nan_to_num(mu, nan=0.0)
+    std = np.where(np.isfinite(std) & (std > 0), std, 1.0)
+    x = np.nan_to_num((x - mu) / std, nan=0.0, posinf=0.0, neginf=0.0)
+
+    f, _, sxx = spectrogram(x, fs, nperseg=fs, noverlap=fs - hop, axis=1)
+    sxx = np.ascontiguousarray(sxx[:, :N_FREQ_BINS, :])
+
+    for kk in range(sxx.shape[0]):
+        xx = sxx[kk]
+        valid = np.sum(xx, axis=0) != 0
+        if not valid.any():
+            continue
+        sub = xx[:, valid]
+        mu_f = sub.mean(axis=1, keepdims=True)
+        sd_f = sub.std(axis=1, keepdims=True)
+        sd_f = np.where(sd_f > 0, sd_f, 1.0)
+        xx[:, valid] = (sub - mu_f) / sd_f
+
     if return_axes:
-        return t, f[:100], x
-    return x
+        t = (np.arange(sxx.shape[2]) + 1) * 0.5
+        return t, f[:N_FREQ_BINS], sxx
+    return sxx
 
 
 def infer_seizure_probability(x, model, use_cuda=False, cuda_number=0):
+    """Run the seizure model on a batch of preprocessed spectrograms.
+
+    Parameters
+    ----------
+    x : array_like, shape (batch_size, 100, n_times)
+        Output of :func:`preprocess_input`. Must be finite and have
+        ``n_times >= 2``. Recommended window length is 300 s (599 columns).
+    model : torch.nn.Module
+        A loaded seizure model, e.g. from ``load_trained_model('modelA')``.
+        The model is temporarily put in eval mode (and moved to the requested
+        device); its original device and train/eval mode are restored on
+        return, so the caller's object is not mutated.
+    use_cuda : bool, optional
+        Run inference on ``cuda:<cuda_number>``. Default False (CPU).
+    cuda_number : int, optional
+        CUDA device index used when ``use_cuda`` is True. Default 0.
+
+    Returns
+    -------
+    numpy.ndarray, shape (batch_size, n_times), float32
+        Seizure probability (softmax probability of class index 3 of the
+        model's 4 output classes) for every spectrogram column. Column ``j``
+        corresponds to the time stamp ``t[j]`` returned by
+        :func:`preprocess_input` (``(j + 1) * 0.5`` s from window start).
+        Values are in [0, 1].
+
+    Raises
+    ------
+    ValueError
+        If ``x`` has the wrong shape or contains non-finite values.
+
+    Notes
+    -----
+    Inference runs under ``torch.inference_mode()``; no autograd graph is kept.
     """
-    infers seizure probability for a given input x; recommended signal len is 300 seconds.
-    :param x: output from preprocess_input function, should be in shape [batch_size, 100, time_in_half-seconds]
-    :param model: loaded seizure model
-    :param use_cuda: if true x is loaded to cuda with cuda_number
-    :param cuda_number:
-    :return: seizure probability for input x in shape [batch_size, x.shape[2]]
-    :rtype: np.array
+    x = np.asarray(x)
+    if x.ndim != 3 or x.shape[1] != N_FREQ_BINS or x.shape[2] < 2:
+        raise ValueError(
+            f"x must have shape (batch_size, {N_FREQ_BINS}, n_times >= 2) as returned by "
+            f"preprocess_input, got {x.shape}"
+        )
+    if not np.all(np.isfinite(x)):
+        raise ValueError("x contains NaN/inf; preprocess_input always returns finite spectrograms")
+
+    device = torch.device(f"cuda:{cuda_number}") if use_cuda else torch.device("cpu")
+    with _model_on_device_eval(model, device), torch.inference_mode():
+        xt = torch.from_numpy(np.ascontiguousarray(x, dtype=np.float32)).to(device)
+        _, probs = model(xt)  # probs: (n_times, batch_size, 4)
+        y = probs[:, :, SEIZURE_CLASS_INDEX].cpu().numpy()
+    return np.ascontiguousarray(y.T)
+
+
+def predict_channel_seizure_probability(
+        x, fs, model='modelA', use_cuda=False, cuda_number=0, n_batch=128,
+        window_s=300, step_s=20, discard_edges_s=10,
+        min_valid_fraction=0.5, fill_recording_edges=True,
+):
+    """Continuous seizure-probability trace for one (long) iEEG channel.
+
+    The signal is cut into overlapping windows of ``window_s`` seconds every
+    ``step_s`` seconds, plus one extra window aligned to the end of the
+    recording so the tail is always covered. Each window is converted to a
+    spectrogram and run through the model; ``discard_edges_s`` seconds are
+    dropped at both window edges (the BiLSTM has little context there), and
+    overlapping windows are combined with a NaN-ignoring maximum.
+
+    Parameters
+    ----------
+    x : array_like, shape (n_samples,)
+        Single-channel raw signal (1D). Lists and integer arrays are accepted.
+        NaN / +-inf mark missing data (gaps).
+    fs : int or float
+        Sampling rate in Hz. Must be a whole, even number >= 200 Hz; a float
+        such as ``500.0`` is accepted. Resample other rates first.
+    model : str or torch.nn.Module, optional
+        ``'modelA'`` (published model), ``'modelB'`` (extended training set)
+        or an already-loaded model. Default ``'modelA'``. A passed model is
+        not mutated (its device and train/eval mode are restored).
+    use_cuda : bool, optional
+        Run inference on ``cuda:<cuda_number>``. Default False.
+    cuda_number : int, optional
+        CUDA device index. Default 0.
+    n_batch : int, optional
+        Windows per inference batch (memory/speed trade-off only; does not
+        change the result). Default 128.
+    window_s : float, optional
+        Window length in seconds; multiple of 0.5, >= 2. Default 300 (the
+        length the model was designed for). The recording must be at least
+        this long.
+    step_s : float, optional
+        Step between window starts in seconds; multiple of 0.5. Must satisfy
+        ``step_s <= window_s - 2 * discard_edges_s - 0.5`` so that the kept
+        (non-discarded) parts of consecutive windows leave no hole (a window
+        has ``2 * window_s - 1`` half-second columns). Default 20.
+    discard_edges_s : float, optional
+        Seconds dropped at each window edge; multiple of 0.5, may be 0.
+        Default 10.
+    min_valid_fraction : float, optional
+        A window is evaluated only if at least this fraction of its 1 s
+        segments (spectrogram columns) are valid, i.e. contain only finite
+        samples and are not flat; otherwise it contributes NaN. Default 0.5.
+    fill_recording_edges : bool, optional
+        The first and last ``discard_edges_s`` seconds of the *recording*
+        lie in no window's kept interior. If True (default), they are taken
+        from the edge of the first/last window (shorter model context, hence
+        less reliable). If False, they are NaN.
+
+    Returns
+    -------
+    t : numpy.ndarray, shape (n_out,)
+        Time in seconds from the first sample: ``t[k] = k * 0.5`` (so the
+        value for time ``t`` is at index ``2 * t``),
+        ``n_out = n_samples // (fs // 2)``. The last stamp is the centre of
+        the last complete 1 s segment.
+    prob : numpy.ndarray, shape (n_out,), float64
+        Seizure probability in [0, 1] for the 1 s segment centred on
+        ``t[k]``, or **NaN where no estimate exists**. NaN is returned for:
+
+        * ``t = 0`` (a 1 s segment centred at 0 s would start before the data),
+        * every 1 s segment containing at least one NaN/inf sample (gaps),
+        * every 1 s segment over which the signal is constant (flat line,
+          e.g. disconnected or saturated channel),
+        * segments covered only by windows with fewer than
+          ``min_valid_fraction`` valid segments,
+        * the first/last ``discard_edges_s`` s if ``fill_recording_edges`` is
+          False.
+
+        NaN therefore always means "not evaluated", never "no seizure"; a
+        value is never 0 merely because a time point was not covered.
+
+    Raises
+    ------
+    ValueError
+        If ``x`` is not 1D, ``fs`` is invalid, the window parameters are
+        inconsistent, or the recording is shorter than ``window_s``.
+
+    Notes
+    -----
+    * Gaps are not interpolated. Within an evaluated window the gap samples
+      are zero-filled for the model (as in the original implementation),
+      which can influence the probability of valid segments next to a gap via
+      the BiLSTM context; only the gap segments themselves are masked to NaN.
+      To fill short gaps instead (e.g. by interpolation), do so before calling
+      this function; filled samples are then treated as valid data.
+    * Probabilities of overlapping windows are combined with a NaN-ignoring
+      maximum (``np.fmax``), as in the published method.
+
+    Examples
+    --------
+    >>> import numpy as np
+    >>> from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
+    >>> fs = 500
+    >>> x = np.random.randn(fs * 600)          # 10 min, single channel
+    >>> t, p = predict_channel_seizure_probability(x, fs, model='modelA')
+    >>> t.shape == p.shape, float(t[1] - t[0])
+    (True, 0.5)
     """
-    x = from_numpy(x)
-    batch_size = x.shape[0]
-    x = x.float()
-    if use_cuda:
-        x = x.cuda(cuda_number)
-        model = model.cuda(cuda_number)
-    else:
-        x = x.cpu()
-        model = model.cpu()
+    fs = _validate_fs(fs)
+    x = np.asarray(x, dtype=np.float64)
+    if x.ndim != 1:
+        raise ValueError(f"input x should be single channel signal (1D array), got shape {x.shape}")
 
-    model = model.eval()
+    hop = fs // 2
+    w2 = _to_half_seconds(window_s, 'window_s', minimum=4)       # >= 2 s
+    s2 = _to_half_seconds(step_s, 'step_s', minimum=1)
+    e2 = _to_half_seconds(discard_edges_s, 'discard_edges_s', minimum=0)
+    n_cols = w2 - 1                       # spectrogram columns per window
+    n_kept = n_cols - 2 * e2
+    if n_kept < 1:
+        raise ValueError(
+            f"discard_edges_s={discard_edges_s} leaves nothing of window_s={window_s}; need "
+            f"2 * discard_edges_s <= window_s - 1"
+        )
+    if s2 > n_kept:
+        raise ValueError(
+            f"step_s={step_s} is too large for window_s={window_s} and discard_edges_s="
+            f"{discard_edges_s}: the kept parts of consecutive windows would leave uncovered "
+            f"time. Need step_s <= window_s - 2 * discard_edges_s - 0.5 = {n_kept / 2} s."
+        )
+    if not 0.0 <= float(min_valid_fraction) <= 1.0:
+        raise ValueError(f"min_valid_fraction must be within [0, 1], got {min_valid_fraction!r}")
+    n_batch = int(n_batch)
+    if n_batch < 1:
+        raise ValueError(f"n_batch must be >= 1, got {n_batch}")
 
-    outputs, probs = model(x)
-    probs = probs[:, :, 3].data.detach().cpu().numpy().flatten()
-    y = probs.reshape(x.shape[2], batch_size).T
-    return y
+    n = x.shape[0]
+    w = w2 * hop                          # window length in samples (= window_s * fs)
+    if n < w:
+        raise ValueError(
+            f"recording is shorter ({n / fs:.2f} s) than window_s={window_s} s; pass a smaller "
+            f"window_s (the model was designed for 300 s windows)"
+        )
 
+    # ---- per-1-s-segment validity on the output grid --------------------
+    # Grid index k (t = k / 2) <-> segment covering samples [(k-1)*hop, (k+1)*hop),
+    # i.e. half-second blocks k-1 and k.
+    n_out = n // hop
+    blocks = x[:n_out * hop].reshape(n_out, hop)
+    blk_finite = np.isfinite(blocks).all(axis=1)
+    blk_max = np.fmax.reduce(blocks, axis=1)
+    blk_min = np.fmin.reduce(blocks, axis=1)
+    seg_valid = np.zeros(n_out, dtype=bool)
+    seg_valid[1:] = (
+        blk_finite[:-1] & blk_finite[1:]
+        & (np.fmax(blk_max[:-1], blk_max[1:]) > np.fmin(blk_min[:-1], blk_min[1:]))
+    )
 
-def predict_channel_seizure_probability(x, fs, model='modelA', use_cuda=False, cuda_number=0, n_batch=128, window_s=300, step_s=20, discard_edges_s=10):
-    """Predict seizure probability for a single-channel signal.
+    # ---- window starts in half-second blocks; always one ending at the recording end
+    last_start = (n - w) // hop
+    starts = np.arange(0, last_start + 1, s2)
+    if starts[-1] != last_start:
+        starts = np.append(starts, last_start)
 
-    The signal is buffered into overlapping windows, converted to spectrograms,
-    run through the seizure model in batches, and the window-level probabilities
-    are realigned to the original time axis.
+    frac_valid = np.array([seg_valid[b0 + 1:b0 + 1 + n_cols].mean() for b0 in starts])
+    starts_eval = starts[frac_valid >= float(min_valid_fraction)]
 
-    Args:
-        x (array-like): 1D single-channel signal (samples, not channels).
-        fs (int | float): Sampling frequency in Hz.
-        model (str | object, optional): Model identifier passed to load_trained_model()
-            or a preloaded model object. Default is 'modelA'.
-        use_cuda (bool, optional): If True, move input to CUDA device for inference.
-            Default is False.
-        cuda_number (int, optional): CUDA device index when use_cuda is True. Default is 0.
-        n_batch (int, optional): Number of buffered windows processed per batch.
-            Default is 128.
-        window_s (int, optional): Window length in seconds for buffering. Default is 300.
-        step_s (int, optional): Step size in seconds between windows. Default is 20.
-        discard_edges_s (int, optional): Seconds to discard at each window edge to
-            avoid boundary artifacts introduced by buffering/spectrogram and a model. Default is 10.
-
-    Returns:
-        tuple:
-            txx (numpy.ndarray): Time vector (in seconds) corresponding to the first
-                buffered window after alignment (1D array).
-            prob (numpy.ndarray): Per-half-second seizure probability values aligned
-                to the original time axis. Length is approximately ceil(t_max * 2).
-
-    Raises:
-        ValueError: If `x` is not a 1D array (function expects a single channel signal).
-
-    Notes:
-        - Recommended input length is at least `window_s` seconds for reliable coverage.
-        - Returned probabilities are in [0, 1].
-        - The function uses `preprocess_input`, `infer_seizure_probability` and
-          `load_trained_model` internally; `model` may be a model name or an already-loaded model.
-
-    Example:
-        >>> t, p = predict_channel_seizure_probability(signal, 200, model='modelA')
-        >>> # t: time vector for first window; p: probability per half-second
-
-    """
-    if x.ndim > 1:
-        raise ValueError("input x should be single channel signal (1D array)")
-
-    if discard_edges_s == window_s:
-        discard_edges_s = int((window_s/2) - 1)
-        warnings.warn("discard_edges_s should NOT be equal to window_s; set to (window_s/2)-1")
-
-    edge = int(np.round(discard_edges_s * 2))
-
-    idx_arr = np.arange(x.shape[0])
-    t = idx_arr / fs
-
-    xb = buffer(x, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
-    tb = buffer(t, fs, segm_size=window_s, overlap=window_s-step_s, drop=True)
-
-    valid_buffer_windows = (tb == -1).sum(1) < tb.shape[1]
-    xb = xb[valid_buffer_windows]
-    tb = tb[valid_buffer_windows]
+    t_out = np.arange(n_out) * 0.5
+    prob_out = np.full(n_out, np.nan)
+    if starts_eval.size == 0:
+        return t_out, prob_out
 
     if isinstance(model, str):
         model = load_trained_model(model)
 
-    prob = []
-    for b in range(0, xb.shape[0], n_batch):
-        xb_ = xb[b:b+n_batch]
-        txx, f, pxx = preprocess_input(xb_, fs, return_axes=True)
-        prob_ = infer_seizure_probability(pxx, model, use_cuda=use_cuda, cuda_number=cuda_number)
-        prob += [prob_]
+    device = torch.device(f"cuda:{cuda_number}") if use_cuda else torch.device("cpu")
+    with _model_on_device_eval(model, device):
+        for b in range(0, starts_eval.size, n_batch):
+            batch_starts = starts_eval[b:b + n_batch]
+            xb = np.stack([x[b0 * hop:b0 * hop + w] for b0 in batch_starts])
+            pxx = preprocess_input(xb, fs)
+            prob = infer_seizure_probability(pxx, model, use_cuda=use_cuda, cuda_number=cuda_number)
+            if prob.shape[1] != n_cols:  # pragma: no cover - internal consistency check
+                raise RuntimeError(f"unexpected number of model outputs {prob.shape[1]} != {n_cols}")
 
-    prob = np.concatenate(prob, 0)
+            for b0, p in zip(batch_starts, prob):
+                lo = 0 if (fill_recording_edges and b0 == 0) else e2
+                hi = n_cols if (fill_recording_edges and b0 == last_start) else n_cols - e2
+                idx = slice(b0 + 1 + lo, b0 + 1 + hi)
+                p = p[lo:hi].astype(np.float64)
+                p[~seg_valid[idx]] = np.nan
+                prob_out[idx] = np.fmax(prob_out[idx], p)
 
-    txx_matrix = np.stack([txx]*prob.shape[0], axis=0)
-    txx_matrix = txx_matrix + tb[:, 0].reshape((-1, 1))
-    txx_matrix[txx_matrix > t[-1]] = -1
-
-    prob_realigned = np.zeros((prob.shape[0], int(np.ceil(t.max()*2))))
-    txx_ref = np.arange(int(np.ceil(t.max()*2))) / 2
-    for i in range(0, prob.shape[0]):
-        txx_ = txx_matrix[i]
-        prob_ = prob[i]
-
-        txx_ = txx_[edge:-edge]
-        prob_ = prob_[edge:-edge]
-
-        idx = np.where(txx_ref == txx_[0])[0][0]
-
-        prob_realigned[i, idx:idx+prob_.shape[0]] = prob_
-
-
-
-    return txx_ref, prob_realigned.max(0)
+    return t_out, prob_out
