@@ -329,6 +329,13 @@ def predict_channel_seizure_probability(
         be ignored where a better window exists. Default 0.0: every window is
         preferred, i.e. the published method. Values > 0 change probabilities
         next to long gaps compared with the published method (not validated).
+        The choice is made per time point, so the result is **not monotone in
+        this value**: a point switches from "preferred windows" to the
+        fallback (all windows) as soon as the last preferred window covering
+        it drops below the threshold, and different points switch at different
+        values. If the value exceeds the valid fraction of every window, no
+        window is preferred and the result equals that of 0.0. Choose one
+        value for a study and do not interpolate between values.
     fill_recording_edges : bool, optional
         The first and last ``discard_edges_s`` seconds of the *recording*
         lie in no window's kept interior. If True (default), they are taken

@@ -39,6 +39,7 @@ the version). Go by the step that failed (full table:
 |---|---|---|
 | guard / test / build, or the token check / upload | nothing published or tagged | Fix the cause (e.g. the token secret), then **Re-run failed jobs** on that same run (possible for 30 days; the `dist` artifact is kept 90 days). |
 | tag push, after a successful upload | PyPI has X.Y.Z, no tag | Do **not** re-run: PyPI files are immutable, so the upload step would fail. Tag the commit that run built (the run's head SHA) by hand: `git tag vX.Y.Z <sha> && git push origin vX.Y.Z`, then `gh release create vX.Y.Z --verify-tag --title vX.Y.Z --generate-notes`. |
+| upload half-succeeded (some files on PyPI, e.g. wheel but not sdist) | PyPI has some files of X.Y.Z, no tag | **Re-run failed jobs** fails (PyPI rejects the files already there) and the workflow deliberately has no `skip-existing`. Download the `dist` artifact of the failed run (`gh run download <run-id> -n dist -D dist`; it is the exact build) and upload only the missing files: `twine upload dist/<missing-file>` (token `PYPI_Token_General`, user `__token__`). Check on PyPI that all files are present, then tag the run's head SHA by hand and create the release as in the tag-push row. |
 | `gh release create`, after the tag push | PyPI + tag, no GitHub Release | `gh release create vX.Y.Z --verify-tag --title vX.Y.Z --generate-notes`. |
 
 ## Breaking changes since 0.1.1 (release as ≥ 0.2.0)

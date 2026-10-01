@@ -8,8 +8,13 @@ estimate, so any change in the numbers of the published method fails the tests.
 
 Usage (from the repository root, with git history available)::
 
-    pip install -e . "brainmaze-utils==2.0.0"   # the old code imports utils.signal.buffer
+    pip install -e . "brainmaze-utils>=2.0.0"   # the old code imports utils.signal.buffer
     python tests/data/make_golden_reference.py
+
+The only utils function the old code needs is ``buffer``. The committed ``.npz`` was
+generated with brainmaze-utils 2.0.0; regenerating it with the utils PR #28 branch gives a
+bit-identical file (verified, max diff 0.0), so 2.0.0 is not strictly required, any
+utils version whose ``buffer`` behaves the same works.
 
 Stored per case (``<case>_...``):
   * ``prob``     : old output, float64, length of the old time axis
