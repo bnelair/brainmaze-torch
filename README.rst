@@ -11,7 +11,7 @@ This project was originally developed as a part of the `BEhavioral STate Analysi
 Documentation
 """""""""""""""
 
-Documentation is available `here <https://bnelair.github.io/brainmaze_torch>`_.
+Documentation is available `here <https://bnelair.github.io/brainmaze-torch/>`_.
 
 
 Installation
@@ -21,6 +21,39 @@ Installation
 
     pip install brainmaze-torch
 
+Requirements: Python >= 3.10, ``numpy >= 1.24`` (1.26 and 2.x are both tested), ``scipy >= 1.10`` and
+``torch >= 2.0``. The CPU build of PyTorch is sufficient; CUDA is optional.
+
+
+Seizure probability: quick start
+"""""""""""""""""""""""""""""""""""""
+
+.. code-block:: python
+
+    import numpy as np
+    from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
+
+    fs = 500                                  # Hz; whole, even number >= 200 (500.0 is fine)
+    x = np.random.randn(fs * 600)             # one channel, 10 min; NaN marks missing data
+    t, p = predict_channel_seizure_probability(x, fs, model='modelA')
+    # t[k] = k * 0.5 s; p[k] = seizure probability of the 1 s of signal centred on t[k]
+
+What the output means:
+
+- One value every 0.5 s, ``len(p) == len(x) // (fs // 2)``. The whole recording is covered, including its
+  start and end.
+- **NaN means "not evaluated", never "no seizure".** ``p`` is NaN at ``t = 0``, for every 1 s segment that
+  contains a NaN/inf sample (a gap) or a flat signal (e.g. a disconnected channel), and for time covered only by
+  windows with less than ``min_valid_fraction`` (default 0.5) valid data. Use ``np.nanmax`` / ``np.isfinite``
+  downstream, and do not replace NaN by 0.
+- ``fs`` must be a whole, even number of Hz and at least 200 Hz. Other rates raise ``ValueError``; resample first
+  (e.g. ``scipy.signal.resample_poly``). Anti-aliasing is up to the caller.
+- The recording must be at least ``window_s`` (default 300 s) long, and ``step_s`` must not exceed
+  ``window_s - 2 * discard_edges_s - 0.5``; otherwise a ``ValueError`` explains what to change.
+
+See the `documentation <https://bnelair.github.io/brainmaze-torch/>`_ for the low-level API
+(``preprocess_input``, ``infer_seizure_probability``) and the details of the time grid.
+
 How to contribute
 """""""""""""""""""""""""""
 
@@ -28,24 +61,31 @@ The project has 2 main protected branches *main* that contains official software
 To implement a new feature a new branch should be created from the *dev* branch with name pattern of *developer_identifier/feature_name*.
 
 After the feature is implemented, a pull request can be created to merge the feature branch into the *dev* branch with. Pull requests need to be reviewed by the code owners.
-Drafting of new releases will be performed by the code owners in using pull request from *dev* to *main* and drafting a new release on GitHub.
+Releasing
+'''''''''''''''''''''''''''''''
 
-New functions need to be implemented with Sphinx compatible docstrings. The documentation is automatically generated from the docstrings using Sphinx using make_docs.sh either calling its contents.
-Documentation source is in docs_src/ and the generated documentation is in docs/. .doctrees is not shared in the repository.
+Releases are automated and never bypass branch protection. To cut a release, a code owner runs the **Prepare release** GitHub Action (*Actions* tab, ``workflow_dispatch``) and selects the bump (*patch* / *minor* / *major*). This opens a small ``Release vX.Y.Z`` pull request that bumps ``[project].version`` in ``pyproject.toml`` on a ``release/bump-*`` branch off *main*. Once a code owner approves and merges that pull request into *main*, the **Release** workflow runs the tests, builds the distributions, publishes them to PyPI (Trusted Publishing), and then tags the version and creates the GitHub release. ``pyproject.toml`` is the single source of truth for the version.
 
-Troubleshooting
-''''''''''''''''''''''''''''''
+Promotion of features from *dev* to *main* is independent of releases and **must not change** ``[project].version``: a *Version guard* CI check fails any pull request outside the release flow that edits it.
 
-If updating the docs web generated using sphinx, there might be a lot of changes resulting in a buffer hang up. Using SSH over HTTPS is preferred. If you are using HTTPS, you can increase the buffer size by running the following command:
+See `RELEASING.md <RELEASING.md>`_ for the step-by-step guide and the one-time setup (PyPI Trusted Publisher, Actions permission to open pull requests).
+
+Building the documentation
+'''''''''''''''''''''''''''''''
+
+New functions need numpy-style docstrings (rendered by Sphinx with ``napoleon``). The documentation is built from ``docs_src/`` and published to GitHub Pages by the **Docs** workflow (``main`` at the site root, ``dev`` under ``/dev/``). To build it locally:
 
 .. code-block:: bash
 
-    git config http.postBuffer 524288000
+    pip install -r docs_src/requirements.txt -e .
+    sphinx-build -b html docs_src/source docs
+
+``docs/`` is ignored by git and must not be committed.
 
 
 License
 """"""""""""""""""
-This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze_torch/blob/master/LICENSE>`_ file in the root directory of this project.
+This software is licensed under BSD-3Clause license. For details see the `LICENSE <https://github.com/bnelair/brainmaze-torch/blob/main/LICENSE>`_ file in the root directory of this project.
 
 
 Acknowledgment

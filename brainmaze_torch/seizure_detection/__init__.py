@@ -1,62 +1,69 @@
 """
-Seizure detection module
-available trained models - 'modelA', 'modelB'
-modelA is the model from the published work.
-modelB had extended training dataset.
-Optimal input for the model is 300 second. It is recommended to use only middle part of the signal.
+Seizure probability from intracranial EEG with a CNN + bidirectional LSTM applied to
+spectrograms (Sladky et al. 2022, Brain Communications, doi:10.1093/braincomms/fcac115).
 
-The module provides two main ways to get seizure probabilities:
+Bundled models (:func:`load_trained_model`):
 
-1.  **Low-level processing**: Use `preprocess_input` and `infer_seizure_probability` for batch processing of pre-windowed signals.
-2.  **High-level processing**: Use `predict_channel_seizure_probability` to get a continuous probability trace from a single long signal.
+- ``'modelA'``: the model from the published work.
+- ``'modelB'``: the same architecture trained on an extended data set.
 
-Example (Low-level)
-...................
+The model was designed for 300 s inputs; its outputs near the ends of an input have
+little LSTM context and are less reliable, which is why the high-level function drops
+``discard_edges_s`` at each window edge.
+
+Two ways to use it:
+
+1. **High level** (recommended): :func:`predict_channel_seizure_probability` turns one
+   long channel into a continuous probability trace on a 0.5 s grid. It handles the
+   windowing, gaps, flat segments and the recording edges.
+2. **Low level**: :func:`preprocess_input` + :func:`infer_seizure_probability` for
+   batches of windows you cut yourself.
+
+Conventions (both levels)
+.........................
+
+- ``fs`` must be a whole, even number of Hz, at least 200 Hz. A float such as ``500.0``
+  (typical of .mat / MEF headers) is accepted. Odd or fractional rates raise
+  ``ValueError``: resample first (anti-aliasing is the caller's job).
+- Spectrogram: 1 s segments (``nperseg = fs``), 0.5 s hop, bins 0-99 Hz at 1 Hz.
+  Column ``j`` of a window describes the 1 s of signal centred ``(j + 1) * 0.5`` s
+  after the window's first sample.
+- In the output of :func:`predict_channel_seizure_probability`, **NaN means "not
+  evaluated", never "no seizure"**: ``t = 0``, every 1 s segment containing NaN/inf or a
+  flat signal, and time covered only by windows with too little valid data are NaN.
+  Combine channels or time with NaN-aware functions (``np.nanmax``) and never replace
+  NaN by 0.
+- The low-level :func:`preprocess_input` zero-fills NaN samples and does **not** mark
+  them; masking is done by the high-level function.
+
+Example (high level, one channel)
+.................................
 
 .. code-block:: python
 
-    from brainmaze_torch.seizure_detection import load_trained_model, preprocess_input, infer_seizure_probability
-    from numpy.random import rand
-
-    # load model
-    modelA = load_trained_model('modelA')
-
-    # load data
-    fs = 500
-    x_len = 300
-    channels = 3
-
-    # create fake data for 3 channels, 300s long
-    x_input = rand(channels, fs * x_len)
-
-    # preprocess; from raw data to spectrogram
-    x = preprocess_input(x_input, fs)
-
-    # get seizure probability; model has 4 output classes, seizure probability is class 4.
-    # output is in shape (batch_size, x_len * 2 - 1); probability value for every half-second
-    y = infer_seizure_probability(x, modelA)
-
-Example (High-level for a single channel)
-.........................................
-
-.. code-block:: python
-
+    import numpy as np
     from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
-    from numpy.random import rand
 
-    # create fake data for a single channel, 10 minutes long
-    fs = 200
-    x_input = rand(fs * 600)
+    fs = 500
+    x = np.random.randn(fs * 600)                 # 10 min, one channel
+    x[100 * fs:130 * fs] = np.nan                 # a 30 s gap
+    t, p = predict_channel_seizure_probability(x, fs, model='modelA')
+    # t = 0, 0.5, 1.0, ... s; p is NaN at t = 0 and over the gap
 
-    # get seizure probability over the entire signal
-    # this function handles windowing, preprocessing, and inference automatically
-    time_vector, probability_trace = predict_channel_seizure_probability(x_input, fs, model='modelA')
+Example (low level, batch of 300 s windows)
+...........................................
 
+.. code-block:: python
 
-Sources
-............
-The seizure detection and training of the model is described in add website.
+    import numpy as np
+    from brainmaze_torch.seizure_detection import (
+        load_trained_model, preprocess_input, infer_seizure_probability)
 
+    model = load_trained_model('modelA')
+    fs = 500
+    x = np.random.randn(3, fs * 300)              # 3 windows (rows) of 300 s
+    t, f, sxx = preprocess_input(x, fs, return_axes=True)   # sxx: (3, 100, 599)
+    y = infer_seizure_probability(sxx, model)     # (3, 599); y[:, j] belongs to t[j]
 """
 
 from brainmaze_torch.seizure_detection._seizure_detect import infer_seizure_probability, preprocess_input, predict_channel_seizure_probability
