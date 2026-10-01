@@ -5,22 +5,37 @@ name: Release
 # feature merges leave the version unchanged and no-op.
 #
 # The shared reusable workflow does guard + test + build (and uploads the `dist` artifact).
-# Publishing to PyPI happens HERE, in this repo's own top-level job, using the org-level API
-# token secret PYPI_Token_General (maintainer decision; brainmaze-eeg/-utils use Trusted
-# Publishing instead -- switching is optional, see RELEASING.md). The tag and GitHub Release
-# are created only after a successful PyPI upload. If the publish fails, nothing is tagged;
-# see RELEASING.md for recovery (a later push to main would release THAT commit instead).
+# Publishing to PyPI happens HERE, in this repo's own top-level `publish` job. Like
+# brainmaze-zmq, this repo publishes with the organisation's PyPI API token (secret
+# PYPI_Token_General; maintainer decision), not Trusted Publishing. The tag and GitHub
+# Release are created only after a successful PyPI upload.
+#
+# If a run fails part-way, do NOT wait for the next push to main: that run would build,
+# publish and tag a different commit. Re-run the failed jobs of THIS run, or finish by hand;
+# see "Recovering from a failed release" in the family guide:
+# https://github.com/bnelair/brainmaze-sphinx/blob/main/RELEASING.md
 
 on:
   push:
     branches: [main]
 
+# One release run at a time, so two quick pushes cannot both see an untagged version and
+# race to publish/tag it. The name must differ from the group the shared workflow uses
+# (release-<repo>), or the called workflow would wait on its own caller.
+concurrency:
+  group: release-caller-${{ github.repository }}
+  cancel-in-progress: false
+
+# Least privilege by default: the reusable guard/test/build jobs (which install and run
+# third-party code) get a read-only token. Only `publish` gets contents: write.
 permissions:
-  contents: read           # least privilege for the reusable build job; publish raises its own
+  contents: read
 
 jobs:
   build:
     uses: bnelair/brainmaze-sphinx/.github/workflows/release.yml@main
+    permissions:
+      contents: read
 
   publish:
     needs: build
@@ -28,23 +43,34 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write      # push the tag + create the GitHub Release
+    env:
+      VERSION: ${{ needs.build.outputs.version }}
     steps:
+      - name: Validate version
+        shell: bash
+        run: |
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::Version '${VERSION}' read from pyproject.toml is not X.Y.Z; refusing to publish."
+            exit 1
+          fi
+
       - name: Download built distributions
         uses: actions/download-artifact@v4
         with:
           name: dist
           path: dist
 
-      - name: Check PyPI token is available
+      - name: Check the PyPI token is available
+        shell: bash
         env:
-          TOKEN: ${{ secrets.PYPI_Token_General }}
+          PYPI_TOKEN: ${{ secrets.PYPI_Token_General }}
         run: |
-          if [ -z "$TOKEN" ]; then
-            echo "::error::Secret PYPI_Token_General is not available to this repository (org secret missing or not shared with brainmaze-torch). Nothing was published or tagged."
+          if [ -z "$PYPI_TOKEN" ]; then
+            echo "::error::Secret PYPI_Token_General is empty or not available to this repository; nothing was published."
             exit 1
           fi
 
-      - name: Publish to PyPI (org API token)
+      - name: Publish to PyPI (organisation API token)
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_Token_General }}
@@ -54,9 +80,9 @@ jobs:
           fetch-depth: 0
 
       - name: Tag and create GitHub Release
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.build.outputs.version }}   # via env, never inlined into the script
         run: |
           set -euo pipefail
           v="v${VERSION}"

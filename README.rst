@@ -21,8 +21,9 @@ Installation
 
     pip install brainmaze-torch
 
-Requirements: Python >= 3.10, ``numpy >= 1.24`` (1.26 and 2.x are both tested), ``scipy >= 1.10`` and
-``torch >= 2.0``. The CPU build of PyTorch is sufficient; CUDA is optional.
+Requirements: Python >= 3.10, ``numpy >= 1.24`` (1.24, 1.26 and 2.x are tested), ``scipy >= 1.10`` and
+``torch >= 2.3`` (older torch wheels cannot use numpy 2: ``torch.from_numpy`` fails with "Numpy is not
+available"). The CPU build of PyTorch is sufficient; CUDA is optional.
 
 
 Seizure probability: quick start
@@ -42,17 +43,42 @@ What the output means:
 
 - One value every 0.5 s, ``len(p) == len(x) // (fs // 2)``. The whole recording is covered, including its
   start and end.
-- **NaN means "not evaluated", never "no seizure".** ``p`` is NaN at ``t = 0``, for every 1 s segment that
-  contains a NaN/inf sample (a gap) or a flat signal (e.g. a disconnected channel), and for time covered only by
-  windows with less than ``min_valid_fraction`` (default 0.5) valid data. Use ``np.nanmax`` / ``np.isfinite``
-  downstream, and do not replace NaN by 0.
+- **NaN means "not evaluated", never "no seizure".** ``p`` is NaN at ``t = 0`` and for every 1 s segment that
+  contains a NaN/inf sample (a gap) or a flat signal (e.g. a disconnected channel); every other segment has a
+  value. Use ``np.nanmax`` / ``np.isfinite`` downstream, and do not replace NaN by 0.
+- Wherever version 0.1.1 produced an estimate, the values are identical (pinned by golden-value tests against
+  0.1.1's output). Inside an evaluated window, gap samples are zero-filled for the model as before, so valid
+  data right next to a long gap can be influenced by it; ``min_valid_fraction > 0`` prefers windows with more
+  valid data there (this changes values next to long gaps and is not validated).
 - ``fs`` must be a whole, even number of Hz and at least 200 Hz. Other rates raise ``ValueError``; resample first
-  (e.g. ``scipy.signal.resample_poly``). Anti-aliasing is up to the caller.
+  (e.g. ``scipy.signal.resample_poly``). Anti-aliasing is up to the caller. These rules come from the spectrogram
+  grid (1 s segments, 0.5 s hop, 100 one-Hz bins), not from the training data.
+- At 200-256 Hz the anti-alias filter of the amplifier or resampler usually attenuates the top bins (from about
+  0.4 x fs, i.e. 80-100 Hz). The model did not see such spectra in training, so this is a silent domain shift;
+  prefer higher rates.
 - The recording must be at least ``window_s`` (default 300 s) long, and ``step_s`` must not exceed
   ``window_s - 2 * discard_edges_s - 0.5``; otherwise a ``ValueError`` explains what to change.
 
 See the `documentation <https://bnelair.github.io/brainmaze-torch/>`_ for the low-level API
 (``preprocess_input``, ``infer_seizure_probability``) and the details of the time grid.
+
+Changes since 0.1.1 (breaking; the next release is >= 0.2.0)
+"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
+
+- ``predict_channel_seizure_probability`` returns **NaN** at ``t = 0`` and for gap / flat 1 s segments
+  (0.1.1: a number, or 0 where nothing was evaluated). Use NaN-aware functions; never ``fillna(0)``.
+- The output has ``len(x) // (fs // 2)`` points: one fewer than 0.1.1 when the recording is not a whole number of
+  half-seconds (that last point lay beyond the data and was always 0).
+- The recording edges and the tail after the last regular window now get values (0.1.1: 0). Wherever 0.1.1
+  produced an estimate the values are unchanged.
+- ``fs`` must be a whole, even number >= 200 Hz; ``discard_edges_s == window_s``, a ``step_s`` that would leave
+  uncovered time, and recordings shorter than ``window_s`` raise ``ValueError``.
+- New keyword arguments ``min_valid_fraction`` (default 0.0 = 0.1.1 behaviour) and ``fill_recording_edges``.
+- Dependencies reduced to ``numpy``, ``scipy`` and ``torch >= 2.3``; packages that 0.1.1 pulled in transitively
+  (``brainmaze_utils``, ``torchvision``, ``torchaudio``, ``pandas``, ...) must be required by your own project if
+  you use them. The private ``brainmaze_torch._config`` module was removed.
+
+Details: `RELEASING.md <https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md>`_.
 
 How to contribute
 """""""""""""""""""""""""""
@@ -66,7 +92,7 @@ Releasing
 
 Releases are automated and never bypass branch protection. To cut a release, a code owner runs the **Prepare release** GitHub Action (*Actions* tab, ``workflow_dispatch``) and selects the bump (*patch* / *minor* / *major*). This opens a small ``Release vX.Y.Z`` pull request that bumps ``[project].version`` in ``pyproject.toml`` on a ``release/bump-*`` branch off *main*. Once a code owner approves and merges that pull request into *main*, the **Release** workflow runs the tests, builds the distributions, publishes them to PyPI (org API token ``PYPI_Token_General``), and then tags the version and creates the GitHub release. ``pyproject.toml`` is the single source of truth for the version.
 
-Promotion of features from *dev* to *main* is independent of releases and **must not change** ``[project].version``: a *Version guard* CI check fails any pull request outside the release flow that edits it.
+Promotion of features from *dev* to *main* is independent of releases and **must not change** ``[project].version``: a *Version guard* CI check flags any pull request outside the release flow that edits it. The check is advisory (no ruleset requires it), so reviewers must not merge a pull request it flags.
 
 See `RELEASING.md <RELEASING.md>`_ for the step-by-step guide and publishing credentials and recovery.
 

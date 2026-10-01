@@ -24,13 +24,18 @@ Conventions (both levels)
 
 - ``fs`` must be a whole, even number of Hz, at least 200 Hz. A float such as ``500.0``
   (typical of .mat / MEF headers) is accepted. Odd or fractional rates raise
-  ``ValueError``: resample first (anti-aliasing is the caller's job).
+  ``ValueError``: resample first (anti-aliasing is the caller's job). These rules come from
+  the spectrogram grid (whole samples per 1 s segment, an integer 0.5 s hop, 100 bins
+  below Nyquist), not from the training data. At 200-256 Hz the anti-alias filter of the
+  acquisition or resampling usually attenuates the upper bins (from ~0.4 fs = 80-100 Hz),
+  which the model did not see in training: prefer higher rates (see
+  :func:`preprocess_input`).
 - Spectrogram: 1 s segments (``nperseg = fs``), 0.5 s hop, bins 0-99 Hz at 1 Hz.
   Column ``j`` of a window describes the 1 s of signal centred ``(j + 1) * 0.5`` s
   after the window's first sample.
 - In the output of :func:`predict_channel_seizure_probability`, **NaN means "not
-  evaluated", never "no seizure"**: ``t = 0``, every 1 s segment containing NaN/inf or a
-  flat signal, and time covered only by windows with too little valid data are NaN.
+  evaluated", never "no seizure"**: ``t = 0`` and every 1 s segment containing NaN/inf or
+  a flat signal are NaN; every other segment has a value.
   Combine channels or time with NaN-aware functions (``np.nanmax``) and never replace
   NaN by 0.
 - The low-level :func:`preprocess_input` zero-fills NaN samples and does **not** mark

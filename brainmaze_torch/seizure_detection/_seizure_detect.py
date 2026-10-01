@@ -64,7 +64,7 @@ def _validate_fs(fs):
         raise ValueError(
             f"fs must be an even number of Hz, got {fs_i}. With an odd rate the 0.5 s spectrogram "
             "hop (fs/2 samples) is not an integer number of samples, so the output would drift off "
-            "the 0.5 s grid the model was trained on. Resample to an even rate first, e.g. "
+            "the 0.5 s output grid. Resample to an even rate first, e.g. "
             "scipy.signal.resample_poly(x, up=2, down=1) or to a standard rate such as 500 Hz."
         )
     return fs_i
@@ -161,9 +161,20 @@ def preprocess_input(x, fs, return_axes=False):
     use :func:`predict_channel_seizure_probability`, which reports any 1 s
     segment containing NaN/inf (or a flat signal) as NaN in its output.
 
-    Odd sampling rates are rejected instead of being silently handled because
-    a hop of ``fs/2`` samples would not be an integer and the output would
-    drift off the 0.5 s grid the model was trained on.
+    Where the ``fs`` rules come from: they follow from the spectrogram grid,
+    not from the training data (whose sampling rate is not documented in this
+    repository). ``nperseg = fs`` needs a whole number of samples per second;
+    the 0.5 s hop (``fs / 2`` samples) needs an even rate, otherwise the output
+    would drift off the 0.5 s grid; and 100 one-Hz bins (0-99 Hz) need a
+    Nyquist frequency of at least 100 Hz, i.e. ``fs >= 200``.
+
+    Anti-aliasing caveat at 200-256 Hz: acquisition (or resampling) anti-alias
+    filters usually start attenuating at about 0.4 * fs, i.e. 80-100 Hz at
+    these rates. The upper spectrogram bins then hold less power than in
+    recordings with a higher native rate, which the model never saw in that
+    form: a silent domain shift. Prefer a native rate >= 250-500 Hz, and when
+    you resample, keep the new rate high enough that the anti-alias filter's
+    transition band lies above 100 Hz.
     """
     fs = _validate_fs(fs)
     x = np.array(x, dtype=np.float64)  # always a copy; never modifies caller data
