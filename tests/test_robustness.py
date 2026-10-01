@@ -19,6 +19,14 @@ FS = 256
 HOP = FS // 2
 # Small windows keep the tests fast; window/step/edge logic is identical to the defaults.
 KW = dict(window_s=10, step_s=1, discard_edges_s=0.5, n_batch=16)
+# float32 inference is not bit-reproducible across BLAS/oneDNN kernels, batch sizes
+# or platforms; compare model outputs with an absolute tolerance (NaN masks exactly).
+ATOL = 1e-5
+
+
+def assert_prob_close(a, b, atol=ATOL):
+    np.testing.assert_array_equal(np.isnan(a), np.isnan(b))
+    np.testing.assert_allclose(a, b, rtol=0, atol=atol, equal_nan=True)
 
 
 @pytest.fixture(scope="module")
@@ -76,8 +84,7 @@ def test_n_batch_does_not_change_result(model):
     _, p1 = predict_channel_seizure_probability(x, FS, model, **{**KW, 'n_batch': 1})
     _, p2 = predict_channel_seizure_probability(x, FS, model, **{**KW, 'n_batch': 1000})
     # identical up to float32 batched-matmul rounding
-    np.testing.assert_array_equal(np.isnan(p1), np.isnan(p2))
-    np.testing.assert_allclose(p1, p2, rtol=0, atol=1e-6)
+    assert_prob_close(p1, p2)
 
 
 @pytest.mark.parametrize("window_s, step_s, discard_edges_s", [(10, 9.5, 0), (10, 8.5, 0.5), (300, 279.5, 10)])
@@ -188,8 +195,8 @@ def test_float_fs_equivalent_to_int(model):
     _, p_int = predict_channel_seizure_probability(x, 500, model, **KW)
     _, p_flt = predict_channel_seizure_probability(x, 500.0, model, **KW)
     _, p_np = predict_channel_seizure_probability(x, np.float32(500), model, **KW)
-    np.testing.assert_array_equal(p_int, p_flt)
-    np.testing.assert_array_equal(p_int, p_np)
+    assert_prob_close(p_int, p_flt)
+    assert_prob_close(p_int, p_np)
 
 
 @pytest.mark.parametrize("fs", [128, 198, 199, 255, 499.9, 1e3 + 0.5, float('nan'), 'abc', None, True])
@@ -219,7 +226,7 @@ def test_window_alignment_on_grid(model):
     x = rng.standard_normal(10 * FS)
     t, p = predict_channel_seizure_probability(x, FS, model, window_s=10, step_s=1, discard_edges_s=0)
     y = infer_seizure_probability(preprocess_input(x, FS), model)[0]
-    np.testing.assert_allclose(p[1:], y, rtol=0, atol=1e-6)
+    np.testing.assert_allclose(p[1:], y, rtol=0, atol=ATOL)
 
 
 # --------------------------------------------------------------------------- #
@@ -258,7 +265,7 @@ def test_list_and_integer_inputs(model):
     x = rng.standard_normal(20 * FS)
     _, p_ref = predict_channel_seizure_probability(x, FS, model, **KW)
     _, p_list = predict_channel_seizure_probability(list(x), FS, model, **KW)
-    np.testing.assert_array_equal(p_ref, p_list)
+    assert_prob_close(p_ref, p_list)
     xi = (x * 1000).astype(np.int16)
     _, p_int = predict_channel_seizure_probability(xi, FS, model, **KW)
     assert np.all(np.isfinite(p_int[1:]))
@@ -283,7 +290,7 @@ def test_model_mode_and_device_restored_and_no_grad():
     assert next(model.parameters()).device.type == 'cpu'
     # dropout must be off during inference (deterministic output despite train mode)
     y2 = infer_seizure_probability(sxx, model)
-    np.testing.assert_array_equal(y1, y2)
+    assert_prob_close(y1, y2)
     assert all(p.grad is None for p in model.parameters())
     predict_channel_seizure_probability(x[0], FS, model, **KW)
     assert model.training
@@ -297,7 +304,7 @@ def test_infer_output_layout(model):
     assert y.shape == (3, sxx.shape[2])
     # each batch row must equal running that row alone (no batch/time transposition)
     for i in range(3):
-        np.testing.assert_allclose(y[i], infer_seizure_probability(sxx[i:i + 1], model)[0], atol=1e-6)
+        np.testing.assert_allclose(y[i], infer_seizure_probability(sxx[i:i + 1], model)[0], atol=ATOL)
 
 
 def test_infer_rejects_wrong_shape(model):

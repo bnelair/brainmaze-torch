@@ -83,7 +83,7 @@ class _ModelsSeizureDetect:
 
     @staticmethod
     def load_model(model_name):
-        state_dict = load(_MODEL_DIR / TRAINED_MODELS[model_name], map_location='cpu')
+        state_dict = load(_MODEL_DIR / TRAINED_MODELS[model_name], map_location='cpu', weights_only=True)
         mod = SeizureDetectModel()
         mod.load_state_dict(state_dict, strict=True)
         mod.eval()
