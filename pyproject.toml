@@ -46,7 +46,8 @@ exclude = ["brainmaze_torch.tests", "brainmaze_torch.tests.*"]
 
 [tool.setuptools.package-data]
 # The trained seizure-detection models are required at runtime and ship in the wheel and
-# the sdist. They are the ONLY non-Python files in the release.
+# the sdist. They are the ONLY non-Python files in the release. They are also listed in
+# `required-assets` in .github/workflows/{ci,release}.yml, so CI fails if they drop out.
 "brainmaze_torch" = ["seizure_detection/_models/*.pt"]
 
 [tool.setuptools]

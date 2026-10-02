@@ -14,4 +14,10 @@ jobs:
       # Fail if the wheel/sdist contain anything but the package (no tests, demos, docs,
       # data); see brainmaze-sphinx check-dist.yml.
       dist-check: error
-      allowed-assets: brainmaze_torch/seizure_detection/_models/*.pt   # trained models, required at runtime
+      # The trained models are required at runtime: the check fails if either is missing
+      # from the wheel or the sdist. Keep this list in sync with release.yml.
+      required-assets: >-
+        brainmaze_torch/seizure_detection/_models/modelA_paper.pt
+        brainmaze_torch/seizure_detection/_models/modelB_full.pt
+      # Any other model file directly in _models/ ('*' does not cross '/').
+      allowed-assets: brainmaze_torch/seizure_detection/_models/*.pt
