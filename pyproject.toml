@@ -42,9 +42,13 @@ test = [
 where = ["."]
 # Only ship the package itself (docs_src/, tests/, img/ must never end up in the wheel).
 include = ["brainmaze_torch", "brainmaze_torch.*"]
+exclude = ["brainmaze_torch.tests", "brainmaze_torch.tests.*"]
 
 [tool.setuptools.package-data]
+# The trained seizure-detection models are required at runtime and ship in the wheel and
+# the sdist. They are the ONLY non-Python files in the release.
 "brainmaze_torch" = ["seizure_detection/_models/*.pt"]
 
 [tool.setuptools]
-include-package-data = true
+# Only the package-data listed above; the sdist is trimmed by MANIFEST.in.
+include-package-data = false
