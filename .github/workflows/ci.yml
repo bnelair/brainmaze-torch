@@ -11,3 +11,7 @@ jobs:
     uses: bnelair/brainmaze-sphinx/.github/workflows/test.yml@main
     with:
       package-import-name: brainmaze_torch
+      # Fail if the wheel/sdist contain anything but the package (no tests, demos, docs,
+      # data); see brainmaze-sphinx check-dist.yml.
+      dist-check: error
+      allowed-assets: brainmaze_torch/seizure_detection/_models/*.pt   # trained models, required at runtime
