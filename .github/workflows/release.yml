@@ -36,6 +36,14 @@ jobs:
     uses: bnelair/brainmaze-sphinx/.github/workflows/release.yml@main
     permissions:
       contents: read
+    with:
+      # Block the publish if the built dist contains anything but the package.
+      dist-check: error
+      # Same lists as ci.yml: the two trained models must be in the wheel AND the sdist.
+      required-assets: >-
+        brainmaze_torch/seizure_detection/_models/modelA_paper.pt
+        brainmaze_torch/seizure_detection/_models/modelB_full.pt
+      allowed-assets: brainmaze_torch/seizure_detection/_models/*.pt
 
   publish:
     needs: build
