@@ -4,9 +4,9 @@
 building blocks for training models. brainmaze-eeg-models is inference only (ONNX Runtime, no
 PyTorch) and has no equivalent; none of the bundled models needs them.
 """
-from brainmaze_torch._removed import removed_error
+from brainmaze_torch._removed import _removed_error
 
-raise removed_error(
+raise _removed_error(
     "brainmaze_torch.models_generic (ResLayer1D, ResLayer2D, Attention1D_MIL)",
     "these were generic PyTorch training building blocks (torch.nn.Module) and brainmaze-eeg-models "
     "is inference only, so there is no replacement.",

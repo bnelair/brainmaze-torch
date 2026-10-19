@@ -10,21 +10,67 @@ compatibility policy, troubleshooting) is in
 brainmaze-torch is retired; its successor is
 [brainmaze-eeg-models](https://github.com/bnelair/brainmaze-eeg-models) (ONNX Runtime, no PyTorch).
 0.3.0 is a compatibility shim: it depends only on `brainmaze-eeg-models>=0.1.0`, re-exports its
-seizure functions under the 0.2.0 names, emits one `DeprecationWarning` on import and raises
+seizure functions under the 0.2.0 names, emits one `FutureWarning` on import (shown by default to every user) and raises
 `ImportError` with advice for the PyTorch-only names (`models_generic`, `SeizureDetectModel`). No
 `torch`, no `.pt` models: the wheel and sdist are Python code only (`dist-check: error`, no
 `required-assets` / `allowed-assets` in `ci.yml` and `release.yml`).
 
 To release it: **Prepare release → `minor`** (0.2.0 → 0.3.0), check that the bot's PR changes only the
 version line, merge it, and watch *Actions → Release* (publishes with the org token
-`PYPI_Token_General`, then tags `v0.3.0` and creates the GitHub Release). Afterwards:
+`PYPI_Token_General`, then tags `v0.3.0` and creates the GitHub Release). Afterwards, **in this order**
+(once the repository is archived it is read-only and no workflow can run any more):
 
-1. Check the release on PyPI and in a fresh venv: `pip install brainmaze-torch==0.3.0` installs no
+1. **Check the release** on PyPI and in a fresh venv: `pip install brainmaze-torch==0.3.0` installs no
    `torch`, and `python -c "from brainmaze_torch.seizure_detection import predict_channel_seizure_probability"`
-   prints the `DeprecationWarning`.
-2. **Archive the GitHub repository** (Settings → General → Danger Zone → Archive), as agreed with the
-   maintainer. There are no further releases: do not run Prepare release again. 0.2.0 (the last
-   PyTorch version) stays on PyPI; do not yank it.
+   prints the `FutureWarning`.
+2. **Check that the docs carry the superseded notice.** The merge of the release PR (and of this PR)
+   triggers *Actions → Docs* on `main`:
+
+   ```bash
+   gh run list --repo bnelair/brainmaze-torch --workflow docs.yml --branch main --limit 3   # latest: success
+   curl -s https://bnelair.github.io/brainmaze-torch/ | grep -c "superseded by"               # must be > 0
+   ```
+
+   If the run failed, re-run it (`gh run rerun <run-id> --repo bnelair/brainmaze-torch`) before going on.
+3. **Replace the stale `models_generic` page on `gh-pages`.** The shared docs workflow deploys with
+   `keep_files: true`, so pages that are no longer built (here `models_generic.html`, which documents the
+   removed PyTorch classes without any notice) stay online forever. Replace it with a stub that carries the
+   notice and redirects to the landing page, and drop its sources:
+
+   ```bash
+   git clone --branch gh-pages --single-branch https://github.com/bnelair/brainmaze-torch.git bt-pages
+   cd bt-pages
+   git rm -q --ignore-unmatch .doctrees/models_generic.doctree _sources/models_generic.rst _sources/models_generic.rst.txt
+   cat > models_generic.html <<'HTML'
+   <!doctype html>
+   <html lang="en"><head><meta charset="utf-8">
+   <meta http-equiv="refresh" content="5; url=index.html">
+   <title>Removed: brainmaze_torch.models_generic</title></head>
+   <body>
+   <p><strong>brainmaze-torch is superseded by
+   <a href="https://github.com/bnelair/brainmaze-eeg-models">brainmaze-eeg-models</a>.</strong>
+   <code>brainmaze_torch.models_generic</code> (PyTorch building blocks) was removed in 0.3.0, the final release.
+   See the <a href="https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch">migration notes</a>.
+   Redirecting to the <a href="index.html">brainmaze-torch documentation</a>...</p>
+   </body></html>
+   HTML
+   git add models_generic.html
+   git commit -m "Replace the removed models_generic page with a superseded notice"
+   git push origin gh-pages
+   cd .. && rm -rf bt-pages
+   curl -s https://bnelair.github.io/brainmaze-torch/models_generic.html | grep -c "superseded by"   # > 0 after Pages redeploys
+   ```
+
+4. **Update the repository "About" text**, which still says "written in PyTorch":
+
+   ```bash
+   gh repo edit bnelair/brainmaze-torch --description "DEPRECATED, superseded by brainmaze-eeg-models (https://github.com/bnelair/brainmaze-eeg-models). Final release 0.3.0 is a compatibility shim; archived."
+   ```
+
+5. **Archive the GitHub repository** (Settings → General → Danger Zone → Archive, or
+   `gh repo archive bnelair/brainmaze-torch --yes`), as agreed with the maintainer. There are no further
+   releases: do not run Prepare release again. 0.2.0 (the last PyTorch version) stays on PyPI; do not
+   yank it.
 
 ## Quick steps
 

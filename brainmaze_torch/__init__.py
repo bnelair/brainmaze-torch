@@ -2,8 +2,9 @@
 
 The seizure-detection functions now live in **brainmaze-eeg-models**
 (``brainmaze_eeg_models.seizure``; ONNX Runtime, no PyTorch). ``brainmaze_torch`` only
-re-exports them and emits one ``DeprecationWarning`` when it is imported. Migrate by
-changing the import::
+re-exports them and emits one ``FutureWarning`` when it is imported (``FutureWarning``,
+not ``DeprecationWarning``, so that every end user sees the notice by default, also when
+the import happens inside a library). Migrate by changing the import::
 
     # before
     from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
@@ -40,10 +41,10 @@ def _caller_stacklevel():
     """``stacklevel`` that attributes the warning to the code that imported brainmaze_torch.
 
     ``warnings.warn`` already skips the import machinery's frames (``importlib._bootstrap``)
-    when it counts ``stacklevel``; this also skips the frames of this package's own modules and of ``importlib.import_module``
-    (e.g. ``import brainmaze_torch.seizure_detection`` runs this module from inside the
-    import of the subpackage). The warning then points at the user's ``import`` line and is
-    shown by default when that line is in ``__main__``.
+    when it counts ``stacklevel``; this also skips the frames of this package's own modules
+    and of ``importlib.import_module`` (e.g. ``import brainmaze_torch.seizure_detection`` runs
+    this module from inside the import of the subpackage). The warning then names the user's
+    ``import`` line, which tells them what to change.
     """
     def internal(frame):  # same rule as warnings._is_internal_frame
         filename = frame.f_code.co_filename
@@ -62,6 +63,6 @@ def _caller_stacklevel():
 
 
 # Emitted once per process: a module body runs only on its first import.
-_warnings.warn(_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=_caller_stacklevel())
+_warnings.warn(_DEPRECATION_MESSAGE, FutureWarning, stacklevel=_caller_stacklevel())
 
 __all__ = ['__version__', 'MIGRATION_URL']

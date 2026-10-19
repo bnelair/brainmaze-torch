@@ -5,12 +5,12 @@ weights bundled with brainmaze-eeg-models.
 """
 from brainmaze_eeg_models.seizure import TRAINED_MODELS, load_trained_model
 
-from brainmaze_torch._removed import SEIZURE_MODEL_CLASS_ADVICE, removed_getattr
+from brainmaze_torch._removed import _SEIZURE_MODEL_CLASS_ADVICE, _removed_getattr
 
 __all__ = ['TRAINED_MODELS', 'load_trained_model']
 
-_PT = ("the PyTorch model class and its .pt weights are gone.", SEIZURE_MODEL_CLASS_ADVICE)
-__getattr__ = removed_getattr(__name__, {
+_PT = ("the PyTorch model class and its .pt weights are gone.", _SEIZURE_MODEL_CLASS_ADVICE)
+__getattr__ = _removed_getattr(__name__, {
     'SeizureDetectModel': _PT,
     '_ModelsSeizureDetect': _PT,
     '_MODEL_DIR': _PT,

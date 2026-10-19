@@ -2,8 +2,8 @@
 
 - every public 0.2.0 name still imports and IS the brainmaze-eeg-models object;
 - 0.2.0-style calls give the brainmaze-eeg-models outputs (golden fixture, both models);
-- exactly one DeprecationWarning per process, naming the successor and the migration page,
-  attributed to the importing code (so it is shown by default for scripts);
+- exactly one FutureWarning per process, naming the successor and the migration page,
+  attributed to the importing code and shown by default (scripts and libraries alike);
 - the names without an equivalent raise ImportError with migration advice;
 - no PyTorch anywhere (not imported, not a dependency).
 """
@@ -130,7 +130,7 @@ def test_torch_module_model_raises_type_error():
 
 
 # --------------------------------------------------------------------------- #
-# DeprecationWarning
+# FutureWarning (deprecation notice for end users: shown by default everywhere)
 # --------------------------------------------------------------------------- #
 def test_deprecation_warning_fires_exactly_once():
     res = _run("""
@@ -143,7 +143,7 @@ def test_deprecation_warning_fires_exactly_once():
                 importlib.import_module(name)
             import brainmaze_torch
             from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
-        dep = [w for w in rec if issubclass(w.category, DeprecationWarning)
+        dep = [w for w in rec if w.category is FutureWarning
                and "brainmaze-torch is retired" in str(w.message)]
         print(len(dep))
         print(dep[0].filename)
@@ -164,18 +164,38 @@ def test_deprecation_warning_fires_exactly_once():
     "import brainmaze_torch",
     "import brainmaze_torch.seizure_detection",
     "from brainmaze_torch.seizure_detection import predict_channel_seizure_probability",
+    "import importlib; importlib.import_module('brainmaze_torch.seizure_detection')",
 ])
-def test_deprecation_warning_shown_by_default_for_scripts(stmt):
-    # Python's default filters show DeprecationWarning only when it is attributed to __main__:
-    # the shim's stacklevel must point at the user's import line for every import form.
+def test_warning_shown_by_default_for_scripts(stmt):
     res = _run(stmt)
     assert res.returncode == 0, res.stderr
-    assert res.stderr.count("DeprecationWarning: brainmaze-torch is retired") == 1, res.stderr
+    assert res.stderr.count("FutureWarning: brainmaze-torch is retired") == 1, res.stderr
+    assert "<string>:1: FutureWarning" in res.stderr   # names the user's import line
 
 
-def test_deprecation_warning_can_be_turned_into_error():
-    res = _run("import brainmaze_torch", "-W", "error::DeprecationWarning")
+def test_warning_shown_by_default_when_a_library_imports_it(tmp_path):
+    # A DeprecationWarning would be hidden here (attributed to a non-__main__ module);
+    # FutureWarning reaches every end user (review R4).
+    (tmp_path / "mylib.py").write_text("import brainmaze_torch.seizure_detection\n")
+    res = _run(f"import sys; sys.path.insert(0, {str(tmp_path)!r}); import mylib")
+    assert res.returncode == 0, res.stderr
+    assert res.stderr.count("FutureWarning: brainmaze-torch is retired") == 1, res.stderr
+    assert "mylib.py:1: FutureWarning" in res.stderr
+
+
+def test_warning_can_be_turned_into_error():
+    res = _run("import brainmaze_torch", "-W", "error::FutureWarning")
     assert res.returncode != 0 and "brainmaze-torch is retired" in res.stderr
+
+
+def test_readme_silencing_snippet_works():
+    res = _run("""
+        import warnings
+        warnings.filterwarnings("ignore", message="brainmaze-torch is retired", category=FutureWarning)
+        import brainmaze_torch.seizure_detection
+    """)
+    assert res.returncode == 0, res.stderr
+    assert "brainmaze-torch is retired" not in res.stderr
 
 
 # --------------------------------------------------------------------------- #
@@ -227,6 +247,21 @@ def test_models_generic_module_import_raises_every_time():
 def test_unknown_attribute_is_a_plain_attribute_error():
     assert not hasattr(sd, "no_such_name")
     assert not hasattr(sd_models, "no_such_name")
+
+
+def test_hasattr_on_removed_name_raises_as_documented():
+    # documented limitation (review R3): ImportError, not False, so the advice is never lost
+    with pytest.raises(ImportError, match="removed in brainmaze-torch 0.3.0"):
+        hasattr(sd, "SeizureDetectModel")
+
+
+@pytest.mark.parametrize("mod", [brainmaze_torch, sd, sd_models, sd_detect])
+def test_no_helper_names_leak(mod):
+    # review R5: only the 0.2.0 names, the re-exports and dunder/private names are public
+    public = {n for n in dir(mod) if not n.startswith("_")}
+    allowed = set(getattr(mod, "__all__", [])) | {"seizure_detection", "version", "PackageNotFoundError",
+                                                    "MIGRATION_URL"}
+    assert public <= allowed, public - allowed
 
 
 # --------------------------------------------------------------------------- #

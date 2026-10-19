@@ -23,6 +23,9 @@ https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaz
   cuda_device_id=k)``, or pass the model name with ``use_cuda=True, cuda_number=k``.
 - Probabilities equal the PyTorch ones to float32 rounding (typically ~1e-6, at most ~2e-5);
   NaN masks are identical.
+- The removed PyTorch class ``SeizureDetectModel`` raises ``ImportError`` with migration advice,
+  also through ``hasattr(module, 'SeizureDetectModel')`` / ``getattr(module, name, default)``
+  (they raise instead of returning False / the default).
 - ``TRAINED_MODELS`` has the same keys (``'modelA'``, ``'modelB'``); its values are now
   ``(onnx_file, sha256)`` instead of the ``.pt`` file name.
 """
@@ -34,7 +37,7 @@ from brainmaze_eeg_models.seizure import (
     preprocess_input,
 )
 
-from brainmaze_torch._removed import SEIZURE_MODEL_CLASS_ADVICE, removed_getattr
+from brainmaze_torch._removed import _SEIZURE_MODEL_CLASS_ADVICE, _removed_getattr
 
 __all__ = [
     'TRAINED_MODELS',
@@ -44,6 +47,6 @@ __all__ = [
     'predict_channel_seizure_probability'
 ]
 
-__getattr__ = removed_getattr(__name__, {
-    'SeizureDetectModel': ("the PyTorch model class is gone.", SEIZURE_MODEL_CLASS_ADVICE),
+__getattr__ = _removed_getattr(__name__, {
+    'SeizureDetectModel': ("the PyTorch model class is gone.", _SEIZURE_MODEL_CLASS_ADVICE),
 })

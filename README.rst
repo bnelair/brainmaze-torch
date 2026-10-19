@@ -9,9 +9,9 @@ BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Tor
    Version 0.3.0 is the **final release**: a compatibility shim. It no longer contains PyTorch code or
    model weights and no longer installs ``torch``; it depends on brainmaze-eeg-models and re-exports its
    seizure-detection functions, which run the same models on ONNX Runtime. Importing ``brainmaze_torch``
-   emits a ``DeprecationWarning``. **The GitHub repository will be archived (read-only) after this
-   release**: there will be no further releases, fixes or support here. Please open issues and pull
-   requests in `brainmaze-eeg-models <https://github.com/bnelair/brainmaze-eeg-models>`_.
+   emits a ``FutureWarning`` (shown by default, so that everyone still using it sees the notice).
+   **The GitHub repository will be archived (read-only) after this release**: there will be no further
+   releases, fixes or support here. Please open issues and pull requests in `brainmaze-eeg-models <https://github.com/bnelair/brainmaze-eeg-models>`_.
 
    Migration notes: https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch
 
@@ -60,7 +60,8 @@ Change the import; the function names, arguments and outputs are the same:
    * - ``...seizure_detection._models.SeizureDetectModel`` (PyTorch class), ``_ModelsSeizureDetect``,
        ``_MODEL_DIR``, the ``.pt`` weights
      - none (the ONNX export of the same weights ships with brainmaze-eeg-models)
-     - raise ``ImportError`` with migration advice
+     - raise ``ImportError`` with migration advice; ``hasattr`` / ``getattr(module, name, default)`` on
+       these names raise too (instead of returning False / the default)
    * - ``brainmaze_torch.models_generic`` (``ResLayer1D``, ``ResLayer2D``, ``Attention1D_MIL``)
      - none: generic PyTorch training building blocks; brainmaze-eeg-models is inference only
      - importing the module raises ``ImportError``; copy the classes from the
@@ -96,7 +97,8 @@ Silencing the warning while you migrate (better: migrate):
 .. code-block:: python
 
     import warnings
-    warnings.filterwarnings("ignore", message="brainmaze-torch is retired", category=DeprecationWarning)
+    warnings.filterwarnings("ignore", message="brainmaze-torch is retired", category=FutureWarning)
+    import brainmaze_torch.seizure_detection          # the filter must be set before the first import
 
 
 Installation
