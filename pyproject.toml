@@ -5,21 +5,20 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "brainmaze-torch"
 version = "0.2.0"
-description = "BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch"
+description = "DEPRECATED (final release): compatibility shim re-exporting brainmaze-eeg-models; use brainmaze-eeg-models instead"
 authors = [
     { name = "Filip Mivalt", email = "mivalt.filip@mayo.edu" }
 ]
 readme = { file = "README.rst", content-type = "text/x-rst" }
 requires-python = ">=3.10"
+# Final release (0.3.0): a shim over the successor package. No PyTorch any more.
 dependencies = [
-    "numpy>=1.24",
-    "scipy>=1.10",
-    "torch>=2.3",           # torch < 2.3 cannot use numpy 2 (torch.from_numpy fails)
+    "brainmaze-eeg-models>=0.1.0",
 ]
 license = { text = "BSD-3-Clause" }
 classifiers = [
     "Topic :: Scientific/Engineering :: Medical Science Apps.",
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 7 - Inactive",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -31,7 +30,7 @@ classifiers = [
     "Intended Audience :: Healthcare Industry",
     "Intended Audience :: Science/Research",
 ]
-urls = { "Homepage" = "https://github.com/bnelair/brainmaze-torch" }
+urls = { "Homepage" = "https://github.com/bnelair/brainmaze-torch", "Successor" = "https://github.com/bnelair/brainmaze-eeg-models", "Migration" = "https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch" }
 
 [project.optional-dependencies]
 test = [
@@ -44,12 +43,7 @@ where = ["."]
 include = ["brainmaze_torch", "brainmaze_torch.*"]
 exclude = ["brainmaze_torch.tests", "brainmaze_torch.tests.*"]
 
-[tool.setuptools.package-data]
-# The trained seizure-detection models are required at runtime and ship in the wheel and
-# the sdist. They are the ONLY non-Python files in the release. They are also listed in
-# `required-assets` in .github/workflows/{ci,release}.yml, so CI fails if they drop out.
-"brainmaze_torch" = ["seizure_detection/_models/*.pt"]
-
 [tool.setuptools]
-# Only the package-data listed above; the sdist is trimmed by MANIFEST.in.
+# Python code only: the trained models (formerly _models/*.pt) now ship, as ONNX, with
+# brainmaze-eeg-models. The sdist is trimmed by MANIFEST.in; CI checks both artifacts.
 include-package-data = false

@@ -4,7 +4,5 @@
    :caption: Modules
 
    seizure_detection
-   models_generic
-
 
 

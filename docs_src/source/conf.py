@@ -22,7 +22,11 @@ projd = os.path.abspath(os.path.join(curwd, '..', '..'))
 sys.path.insert(0, projd)
 
 # Version is single-sourced from the package (pyproject.toml -> importlib.metadata).
-from brainmaze_torch import __version__
+# (The package's retirement FutureWarning is expected here; keep the docs build log clean.)
+import warnings
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message="brainmaze-torch is retired", category=FutureWarning)
+    from brainmaze_torch import __version__
 
 # -- Project information -----------------------------------------------------
 

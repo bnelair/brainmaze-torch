@@ -37,13 +37,9 @@ jobs:
     permissions:
       contents: read
     with:
-      # Block the publish if the built dist contains anything but the package.
+      # Block the publish if the built dist contains anything but the package. As in ci.yml:
+      # Python code only since 0.3.0 (no assets; the models live in brainmaze-eeg-models).
       dist-check: error
-      # Same lists as ci.yml: the two trained models must be in the wheel AND the sdist.
-      required-assets: >-
-        brainmaze_torch/seizure_detection/_models/modelA_paper.pt
-        brainmaze_torch/seizure_detection/_models/modelB_full.pt
-      allowed-assets: brainmaze_torch/seizure_detection/_models/*.pt
 
   publish:
     needs: build

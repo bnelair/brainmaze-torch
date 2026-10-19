@@ -1,9 +1,8 @@
-# Release artifacts (wheel AND sdist) ship only the package code and the runtime assets
-# listed under [tool.setuptools.package-data] in pyproject.toml: the trained models
-# brainmaze_torch/seizure_detection/_models/*.pt, which must stay (never exclude *.pt here).
-# This file only keeps setuptools' default sdist extras out. The real guard is the shared
-# artifact check (brainmaze-sphinx check-dist.yml, `dist-check: error` + `required-assets`
-# in ci.yml and release.yml), which fails on anything else and on a missing model.
+# Release artifacts (wheel AND sdist) ship only the package code. Since 0.3.0 (the final
+# release, a shim over brainmaze-eeg-models) there are no data files: the trained models live
+# in brainmaze-eeg-models. This file only keeps setuptools' default sdist extras out. The real
+# guard is the shared artifact check (brainmaze-sphinx check-dist.yml, `dist-check: error` in
+# ci.yml and release.yml), which fails on anything but Python code.
 prune tests
 prune docs_src
 prune img

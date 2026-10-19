@@ -1,17 +1,104 @@
-
 BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch
 """""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
 
-This toolbox provides tools for processing of intracranial EEG recordings. Specifically, this tool comprises Pytorch modules and utilities developed within this project. See below and documentation for specific sections. This tool was separated from the BrainMaze toolbox to support a convenient and lightweight sharing of these tools across projects.
+.. warning::
 
-This project was originally developed as a part of the `BEhavioral STate Analysis Toolbox (BEST) <https://github.com/bnelair/best-toolbox>`_ project. However, the development has transferred to the BrainMaze project.
+   **DEPRECATED: brainmaze-torch is retired. Use** `brainmaze-eeg-models <https://github.com/bnelair/brainmaze-eeg-models>`_
+   **instead** (``pip install brainmaze-eeg-models``, ``import brainmaze_eeg_models.seizure``).
+
+   Version 0.3.0 is the **final release**: a compatibility shim. It no longer contains PyTorch code or
+   model weights and no longer installs ``torch``; it depends on brainmaze-eeg-models and re-exports its
+   seizure-detection functions, which run the same models on ONNX Runtime. Importing ``brainmaze_torch``
+   emits a ``FutureWarning`` (shown by default, so that everyone still using it sees the notice).
+   **The GitHub repository will be archived (read-only) after this release**: there will be no further
+   releases, fixes or support here. Please open issues and pull requests in `brainmaze-eeg-models <https://github.com/bnelair/brainmaze-eeg-models>`_.
+
+   Migration notes: https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch
 
 
+Migrating to brainmaze-eeg-models
+"""""""""""""""""""""""""""""""""""
 
-Documentation
-"""""""""""""""
+Change the import; the function names, arguments and outputs are the same:
 
-Documentation is available `here <https://bnelair.github.io/brainmaze-torch/>`_.
+.. code-block:: python
+
+    # before (brainmaze-torch)
+    from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
+    # after (brainmaze-eeg-models)
+    from brainmaze_eeg_models.seizure import predict_channel_seizure_probability
+
+    t, p = predict_channel_seizure_probability(x, fs, model='modelA')   # unchanged call
+
+.. list-table:: brainmaze-torch 0.2.0 -> brainmaze-eeg-models (and what the 0.3.0 shim does)
+   :header-rows: 1
+   :widths: 34 33 33
+
+   * - brainmaze-torch 0.2.0
+     - brainmaze-eeg-models
+     - notes
+   * - ``brainmaze_torch.seizure_detection.predict_channel_seizure_probability``
+     - ``brainmaze_eeg_models.seizure.predict_channel_seizure_probability``
+     - same signature and output (also positional ``use_cuda``, ``cuda_number``); CPU by default as in
+       0.2.0; new keyword ``device='cpu' | 'cuda' | 'auto'``
+   * - ``...seizure_detection.preprocess_input``
+     - ``brainmaze_eeg_models.seizure.preprocess_input``
+     - identical code and output
+   * - ``...seizure_detection.infer_seizure_probability``
+     - ``brainmaze_eeg_models.seizure.infer_seizure_probability``
+     - same; ``model`` may also be a name (default ``'modelA'``); a ``torch.nn.Module`` raises ``TypeError``
+   * - ``...seizure_detection.load_trained_model('modelA' | 'modelB')``
+     - ``brainmaze_eeg_models.seizure.load_trained_model``
+     - returns an ``OnnxModel`` (not a ``torch.nn.Module``); new ``device`` (default ``'cpu'``),
+       ``threads``, ``cuda_device_id``
+   * - ``...seizure_detection._models.TRAINED_MODELS``
+     - ``brainmaze_eeg_models.seizure.TRAINED_MODELS``
+     - same keys; values are now ``(onnx_file, sha256)`` instead of the ``.pt`` file name
+   * - ``...seizure_detection._seizure_detect`` (module path)
+     - ``brainmaze_eeg_models.seizure``
+     - the four functions and ``N_FREQ_BINS``, ``MIN_FS``, ``SEIZURE_CLASS_INDEX`` still import from the old path
+   * - ``...seizure_detection._models.SeizureDetectModel`` (PyTorch class), ``_ModelsSeizureDetect``,
+       ``_MODEL_DIR``, the ``.pt`` weights
+     - none (the ONNX export of the same weights ships with brainmaze-eeg-models)
+     - raise ``ImportError`` with migration advice; ``hasattr`` / ``getattr(module, name, default)`` on
+       these names raise too (instead of returning False / the default)
+   * - ``brainmaze_torch.models_generic`` (``ResLayer1D``, ``ResLayer2D``, ``Attention1D_MIL``)
+     - none: generic PyTorch training building blocks; brainmaze-eeg-models is inference only
+     - importing the module raises ``ImportError``; copy the classes from the
+       `0.2.0 source <https://github.com/bnelair/brainmaze-torch/blob/v0.2.0/brainmaze_torch/models_generic.py>`_
+       or pin ``brainmaze-torch==0.2.0``
+
+**One 0.2.0 pattern now raises** ``ValueError`` (loudly, never silently): loading a model and then
+asking for the GPU per call,
+
+.. code-block:: python
+
+    m = load_trained_model('modelA')                                # 0.2.0: always a CPU model
+    predict_channel_seizure_probability(x, fs, m, use_cuda=True)    # 0.2.0: ran on cuda:0; now ValueError
+
+An ONNX Runtime session cannot move between devices. Choose the device when loading, or pass the
+model name:
+
+.. code-block:: python
+
+    m = load_trained_model('modelA', device='cuda', cuda_device_id=0)   # GPU k: cuda_device_id=k
+    predict_channel_seizure_probability(x, fs, m)
+    # or
+    predict_channel_seizure_probability(x, fs, 'modelA', use_cuda=True, cuda_number=0)
+
+Numbers: the ONNX models are exported from the 0.2.0 weights and give the same probabilities as
+PyTorch to float32 rounding (typically ~1e-6, at most ~2e-5), with identical NaN masks; the golden
+tests of this repository (outputs of the published 0.1.1 code, tolerance 1e-4) pass unchanged on the
+shim. For a GPU, install ``onnxruntime-gpu`` in place of ``onnxruntime`` as described in the
+`brainmaze-eeg-models README <https://github.com/bnelair/brainmaze-eeg-models#nvidia-gpu>`_.
+
+Silencing the warning while you migrate (better: migrate):
+
+.. code-block:: python
+
+    import warnings
+    warnings.filterwarnings("ignore", message="brainmaze-torch is retired", category=FutureWarning)
+    import brainmaze_torch.seizure_detection          # the filter must be set before the first import
 
 
 Installation
@@ -19,94 +106,37 @@ Installation
 
 .. code-block:: bash
 
-    pip install brainmaze-torch
+    pip install brainmaze-eeg-models        # recommended: the successor
+    pip install -U brainmaze-torch          # only to keep old code running (0.3.0 shim, no torch)
 
-Requirements: Python >= 3.10, ``numpy >= 1.24`` (1.24, 1.26 and 2.x are tested), ``scipy >= 1.10`` and
-``torch >= 2.3`` (older torch wheels cannot use numpy 2: ``torch.from_numpy`` fails with "Numpy is not
-available"). The CPU build of PyTorch is sufficient; CUDA is optional.
+Requirements: Python >= 3.10 and ``brainmaze-eeg-models >= 0.1.0`` (which brings ``numpy``, ``scipy``,
+``onnxruntime`` and ``brainmaze-utils``). Upgrading from 0.2.0 removes the bundled ``.pt`` weights but
+leaves an installed ``torch`` in place; uninstall it yourself if nothing else needs it. Projects that
+need the PyTorch implementation itself can pin ``brainmaze-torch==0.2.0`` (``torch >= 2.3``); it stays
+on PyPI but is not maintained.
 
 
-Seizure probability: quick start
-"""""""""""""""""""""""""""""""""""""
+History
+"""""""""""""""""""
 
-.. code-block:: python
+- **0.3.0** (final): compatibility shim over brainmaze-eeg-models (see above); ``torch`` and the ``.pt``
+  models removed; the repository is archived after this release.
+- **0.2.0**: NaN for unevaluated time, full coverage of the recording, stricter input validation,
+  dependencies reduced to ``numpy``, ``scipy``, ``torch >= 2.3``. Details:
+  `RELEASING.md <https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md>`_.
 
-    import numpy as np
-    from brainmaze_torch.seizure_detection import predict_channel_seizure_probability
+This project was originally developed as a part of the `BEhavioral STate Analysis Toolbox (BEST)
+<https://github.com/bnelair/best-toolbox>`_ project; development then moved to the BrainMaze project and,
+for the trained models, to brainmaze-eeg-models.
 
-    fs = 500                                  # Hz; whole, even number >= 200 (500.0 is fine)
-    x = np.random.randn(fs * 600)             # one channel, 10 min; NaN marks missing data
-    t, p = predict_channel_seizure_probability(x, fs, model='modelA')
-    # t[k] = k * 0.5 s; p[k] = seizure probability of the 1 s of signal centred on t[k]
 
-What the output means:
-
-- One value every 0.5 s, ``len(p) == len(x) // (fs // 2)``. The whole recording is covered, including its
-  start and end.
-- **NaN means "not evaluated", never "no seizure".** ``p`` is NaN at ``t = 0`` and for every 1 s segment that
-  contains a NaN/inf sample (a gap) or a flat signal (e.g. a disconnected channel); every other segment has a
-  value. Use ``np.nanmax`` / ``np.isfinite`` downstream, and do not replace NaN by 0.
-- Wherever version 0.1.1 produced an estimate, the values are identical (pinned by golden-value tests against
-  0.1.1's output). Inside an evaluated window, gap samples are zero-filled for the model as before, so valid
-  data right next to a long gap can be influenced by it; ``min_valid_fraction > 0`` prefers windows with more
-  valid data there (this changes values next to long gaps and is not validated).
-- ``fs`` must be a whole, even number of Hz and at least 200 Hz. Other rates raise ``ValueError``; resample first
-  (e.g. ``scipy.signal.resample_poly``). Anti-aliasing is up to the caller. These rules come from the spectrogram
-  grid (1 s segments, 0.5 s hop, 100 one-Hz bins), not from the training data.
-- At 200-256 Hz the anti-alias filter of the amplifier or resampler usually attenuates the top bins (from about
-  0.4 x fs, i.e. 80-100 Hz). The model did not see such spectra in training, so this is a silent domain shift;
-  prefer higher rates.
-- The recording must be at least ``window_s`` (default 300 s) long, and ``step_s`` must not exceed
-  ``window_s - 2 * discard_edges_s - 0.5``; otherwise a ``ValueError`` explains what to change.
-
-See the `documentation <https://bnelair.github.io/brainmaze-torch/>`_ for the low-level API
-(``preprocess_input``, ``infer_seizure_probability``) and the details of the time grid.
-
-Changes since 0.1.1 (breaking; the next release is >= 0.2.0)
-"""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""""
-
-- ``predict_channel_seizure_probability`` returns **NaN** at ``t = 0`` and for gap / flat 1 s segments
-  (0.1.1: a number, or 0 where nothing was evaluated). Use NaN-aware functions; never ``fillna(0)``.
-- The output has ``len(x) // (fs // 2)`` points: one fewer than 0.1.1 when the recording is not a whole number of
-  half-seconds (that last point lay beyond the data and was always 0).
-- The recording edges and the tail after the last regular window now get values (0.1.1: 0). Wherever 0.1.1
-  produced an estimate the values are unchanged.
-- ``fs`` must be a whole, even number >= 200 Hz; ``discard_edges_s == window_s``, a ``step_s`` that would leave
-  uncovered time, and recordings shorter than ``window_s`` raise ``ValueError``.
-- New keyword arguments ``min_valid_fraction`` (default 0.0 = 0.1.1 behaviour) and ``fill_recording_edges``.
-- Dependencies reduced to ``numpy``, ``scipy`` and ``torch >= 2.3``; packages that 0.1.1 pulled in transitively
-  (``brainmaze_utils``, ``torchvision``, ``torchaudio``, ``pandas``, ...) must be required by your own project if
-  you use them. The private ``brainmaze_torch._config`` module was removed.
-
-Details: `RELEASING.md <https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md>`_.
-
-How to contribute
-"""""""""""""""""""""""""""
-
-The project has 2 main protected branches *main* that contains official software releases and *dev* that contains the latest feature implementations shared with developers.
-To implement a new feature a new branch should be created from the *dev* branch with name pattern of *developer_identifier/feature_name*.
-
-After the feature is implemented, a pull request can be created to merge the feature branch into the *dev* branch with. Pull requests need to be reviewed by the code owners.
 Releasing
 '''''''''''''''''''''''''''''''
 
-Releases are automated and never bypass branch protection. To cut a release, a code owner runs the **Prepare release** GitHub Action (*Actions* tab, ``workflow_dispatch``) and selects the bump (*patch* / *minor* / *major*). This opens a small ``Release vX.Y.Z`` pull request that bumps ``[project].version`` in ``pyproject.toml`` on a ``release/bump-*`` branch off *main*. Once a code owner approves and merges that pull request into *main*, the **Release** workflow runs the tests, builds the distributions, publishes them to PyPI (org API token ``PYPI_Token_General``), and then tags the version and creates the GitHub release. ``pyproject.toml`` is the single source of truth for the version.
-
-Promotion of features from *dev* to *main* is independent of releases and **must not change** ``[project].version``: a *Version guard* CI check flags any pull request outside the release flow that edits it. The check is advisory (no ruleset requires it), so reviewers must not merge a pull request it flags.
-
-See `RELEASING.md <RELEASING.md>`_ for the step-by-step guide and publishing credentials and recovery.
-
-Building the documentation
-'''''''''''''''''''''''''''''''
-
-New functions need numpy-style docstrings (rendered by Sphinx with ``napoleon``). The documentation is built from ``docs_src/`` and published to GitHub Pages by the **Docs** workflow (``main`` at the site root, ``dev`` under ``/dev/``). To build it locally:
-
-.. code-block:: bash
-
-    pip install -r docs_src/requirements.txt -e .
-    sphinx-build -b html docs_src/source docs
-
-``docs/`` is ignored by git and must not be committed.
+0.3.0 is the final release (see `RELEASING.md <https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md>`_):
+a code owner runs **Prepare release** (*minor*: 0.2.0 -> 0.3.0) and merges the ``Release v0.3.0`` pull
+request; the **Release** workflow tests, builds, publishes to PyPI (org API token ``PYPI_Token_General``),
+tags and creates the GitHub release. The repository is archived afterwards.
 
 
 License
@@ -116,7 +146,7 @@ This software is licensed under BSD-3Clause license. For details see the `LICENS
 
 Acknowledgment
 """""""""""""""""""
-This code was developed and originally published for the first time by (Mivalt 2022, and Sladky 2022). Additionally, codes related to individual projects available in this repository are stated below. When using this toolbox, we appreciate you citing the papers related to the utilized functionality. Please, see the sections below for references to individual submodules.
+This code was developed and originally published for the first time by (Mivalt 2022, and Sladky 2022). Additionally, codes related to individual projects available in this repository are stated below. When using these models (now in brainmaze-eeg-models), we appreciate you citing the papers related to the utilized functionality. Please, see the sections below for references to individual submodules.
 
  | F. Mivalt et V. Kremen et al., “Electrical brain stimulation and continuous behavioral state tracking in ambulatory humans,” J. Neural Eng., vol. 19, no. 1, p. 016019, Feb. 2022, doi: 10.1088/1741-2552/ac4bfd.
  |
