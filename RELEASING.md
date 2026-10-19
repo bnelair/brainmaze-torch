@@ -5,13 +5,34 @@ works, recovering from a failed release, one-time setup, branch protection, depe
 compatibility policy, troubleshooting) is in
 **[bnelair/brainmaze-sphinx RELEASING.md](https://github.com/bnelair/brainmaze-sphinx/blob/main/RELEASING.md)**.
 
+## 0.3.0 is the FINAL release
+
+brainmaze-torch is retired; its successor is
+[brainmaze-eeg-models](https://github.com/bnelair/brainmaze-eeg-models) (ONNX Runtime, no PyTorch).
+0.3.0 is a compatibility shim: it depends only on `brainmaze-eeg-models>=0.1.0`, re-exports its
+seizure functions under the 0.2.0 names, emits one `DeprecationWarning` on import and raises
+`ImportError` with advice for the PyTorch-only names (`models_generic`, `SeizureDetectModel`). No
+`torch`, no `.pt` models: the wheel and sdist are Python code only (`dist-check: error`, no
+`required-assets` / `allowed-assets` in `ci.yml` and `release.yml`).
+
+To release it: **Prepare release → `minor`** (0.2.0 → 0.3.0), check that the bot's PR changes only the
+version line, merge it, and watch *Actions → Release* (publishes with the org token
+`PYPI_Token_General`, then tags `v0.3.0` and creates the GitHub Release). Afterwards:
+
+1. Check the release on PyPI and in a fresh venv: `pip install brainmaze-torch==0.3.0` installs no
+   `torch`, and `python -c "from brainmaze_torch.seizure_detection import predict_channel_seizure_probability"`
+   prints the `DeprecationWarning`.
+2. **Archive the GitHub repository** (Settings → General → Danger Zone → Archive), as agreed with the
+   maintainer. There are no further releases: do not run Prepare release again. 0.2.0 (the last
+   PyTorch version) stays on PyPI; do not yank it.
+
 ## Quick steps
 
 1. Make sure `main` has what you want to release and CI is green.
 2. **Actions → Prepare release → Run workflow**, pick `patch` / `minor` / `major`
    (changed numerical results and API changes count as breaking; while the version is 0.x a
-   breaking change bumps `minor`). **The next release must be at least `0.2.0` (pick
-   `minor`)**: see "Breaking changes since 0.1.1" below.
+   breaking change bumps `minor`). **The next (and final) release is `0.3.0` (pick
+   `minor`)**: see "0.3.0 is the FINAL release" above.
 3. Review the bot's **"Release vX.Y.Z"** PR and check that its diff is exactly the one
    `version = "X.Y.Z"` line in `pyproject.toml`. CI and the Version guard don't run on it
    (PRs opened with `GITHUB_TOKEN` trigger no workflows), so this check is yours. Then
@@ -42,7 +63,7 @@ the version). Go by the step that failed (full table:
 | upload half-succeeded (some files on PyPI, e.g. wheel but not sdist) | PyPI has some files of X.Y.Z, no tag | **Re-run failed jobs** fails (PyPI rejects the files already there) and the workflow deliberately has no `skip-existing`. Download the `dist` artifact of the failed run (`gh run download <run-id> -n dist -D dist`; it is the exact build) and upload only the missing files: `twine upload dist/<missing-file>` (token `PYPI_Token_General`, user `__token__`). Check on PyPI that all files are present, then tag the run's head SHA by hand and create the release as in the tag-push row. |
 | `gh release create`, after the tag push | PyPI + tag, no GitHub Release | `gh release create vX.Y.Z --verify-tag --title vX.Y.Z --generate-notes`. |
 
-## Breaking changes since 0.1.1 (release as ≥ 0.2.0)
+## Breaking changes since 0.1.1 (released as 0.2.0)
 
 `predict_channel_seizure_probability`:
 
@@ -62,7 +83,7 @@ the version). Go by the step that failed (full table:
 - **New keyword arguments** `min_valid_fraction` (default 0.0 = 0.1.1 behaviour) and
   `fill_recording_edges` (default True).
 
-Packaging: the runtime dependencies are now only `numpy>=1.24`, `scipy>=1.10` and `torch>=2.3`
+Packaging (0.2.0): the runtime dependencies were reduced to `numpy>=1.24`, `scipy>=1.10` and `torch>=2.3`
 (torch < 2.3 cannot use numpy 2). 0.1.1 also pulled in `brainmaze_utils`, `torchvision`,
 `torchaudio`, `pandas`, `scikit-learn`, `matplotlib`, `sphinx` and others; code that relied on
 them arriving transitively must now depend on them itself. The private module
@@ -80,7 +101,7 @@ them arriving transitively must now depend on them itself. The private module
 
 ## Publishing credentials
 
-`brainmaze-torch` is already on PyPI (0.0.1, 0.1.0 and 0.1.1), uploaded with the API token `PYPI_Token_General`.
+`brainmaze-torch` is already on PyPI (0.0.1 to 0.2.0; 0.2.0 was published by the Release workflow), uploaded with the API token `PYPI_Token_General`.
 By maintainer decision, `release.yml` keeps using that token (brainmaze-eeg and brainmaze-utils use Trusted Publishing).
 The repository itself has no Actions secrets, so the token is an organisation-level secret that must be shared
 with this repository. The publish job first checks that the secret is non-empty and fails with a clear error
