@@ -4,7 +4,6 @@ import warnings
 from pathlib import Path
 
 
-import torch
 import numpy as np
 from scipy.io import loadmat
 from brainmaze_torch.seizure_detection._seizure_detect import (
@@ -121,5 +120,6 @@ def test_modelB_loads():
     """Test that modelB can be loaded successfully."""
     model = load_trained_model('modelB')
     assert model is not None
-    # Model should be in eval mode
-    assert not model.training
+    # 0.3.0: an ONNX Runtime session (brainmaze-eeg-models), no longer a torch.nn.Module
+    from brainmaze_eeg_models.runtime import OnnxModel
+    assert isinstance(model, OnnxModel)

@@ -3,10 +3,14 @@
 These pin down the output contract of ``predict_channel_seizure_probability``:
 complete coverage wherever data exists, NaN (never 0) for anything that was not
 evaluated, and explicit errors for unsupported inputs instead of silent garbage.
+
+Since 0.3.0 (the shim over brainmaze-eeg-models) they run unchanged through the re-exported
+functions, except the two PyTorch-specific tests (model train/eval mode and device restored,
+``torch.inference_mode``), which have no meaning for an ONNX Runtime session; see
+``tests/test_shim.py`` for the behaviour that replaced them.
 """
 import numpy as np
 import pytest
-import torch
 
 from brainmaze_torch.seizure_detection import (
     infer_seizure_probability,
@@ -310,22 +314,6 @@ def test_caller_data_not_modified(model):
     np.testing.assert_array_equal(x, x_copy)
 
 
-def test_model_mode_and_device_restored_and_no_grad():
-    model = load_trained_model('modelA')
-    model.train()
-    x = np.random.default_rng(14).standard_normal((2, 10 * FS))
-    sxx = preprocess_input(x, FS)
-    y1 = infer_seizure_probability(sxx, model)
-    assert model.training, "caller's train/eval mode must be restored"
-    assert next(model.parameters()).device.type == 'cpu'
-    # dropout must be off during inference (deterministic output despite train mode)
-    y2 = infer_seizure_probability(sxx, model)
-    assert_prob_close(y1, y2)
-    assert all(p.grad is None for p in model.parameters())
-    predict_channel_seizure_probability(x[0], FS, model, **KW)
-    assert model.training
-
-
 def test_infer_output_layout(model):
     rng = np.random.default_rng(15)
     x = rng.standard_normal((3, 10 * FS))
@@ -342,10 +330,3 @@ def test_infer_rejects_wrong_shape(model):
         infer_seizure_probability(np.zeros((100, 20)), model)
     with pytest.raises(ValueError):
         infer_seizure_probability(np.zeros((1, 99, 20)), model)
-
-
-def test_inference_mode_used(model):
-    sxx = preprocess_input(np.random.default_rng(16).standard_normal(10 * FS), FS)
-    with torch.enable_grad():
-        y = infer_seizure_probability(sxx, model)
-    assert isinstance(y, np.ndarray)
