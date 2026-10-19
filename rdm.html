@@ -199,14 +199,13 @@
         <ul class="nav bd-sidenav bd-sidenav__home-link">
             <li class="toctree-l1">
                 <a class="reference internal" href="index.html">
-                    BrainMaze - Torch
+                    BrainMaze - Torch (superseded by brainmaze-eeg-models)
                 </a>
             </li>
         </ul>
         <p aria-level="2" class="caption" role="heading"><span class="caption-text">Modules</span></p>
 <ul class="nav bd-sidenav">
-<li class="toctree-l1"><a class="reference internal" href="seizure_detection.html">Seizure Detection</a></li>
-<li class="toctree-l1"><a class="reference internal" href="models_generic.html">Models Generic</a></li>
+<li class="toctree-l1"><a class="reference internal" href="seizure_detection.html">Seizure Detection (deprecated shim)</a></li>
 </ul>
 
     </div>
@@ -375,12 +374,10 @@
             <nav aria-label="Page">
                 <ul class="pst-show_toc_level nav section-nav flex-column">
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#migrating-to-brainmaze-eeg-models">Migrating to brainmaze-eeg-models</a></li>
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#seizure-probability-quick-start">Seizure probability: quick start</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-since-0-1-1-breaking-the-next-release-is-0-2-0">Changes since 0.1.1 (breaking; the next release is &gt;= 0.2.0)</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-contribute">How to contribute</a><ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-the-documentation">Building the documentation</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#history">History</a><ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing">Releasing</a></li>
 </ul>
 </li>
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#license">License</a></li>
@@ -403,92 +400,140 @@
                   
   <section id="brainmaze-brain-electrophysiology-behavior-and-dynamics-analysis-toolbox-torch">
 <h1>BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch<a class="headerlink" href="#brainmaze-brain-electrophysiology-behavior-and-dynamics-analysis-toolbox-torch" title="Link to this heading">#</a></h1>
-<p>This toolbox provides tools for processing of intracranial EEG recordings. Specifically, this tool comprises Pytorch modules and utilities developed within this project. See below and documentation for specific sections. This tool was separated from the BrainMaze toolbox to support a convenient and lightweight sharing of these tools across projects.</p>
-<p>This project was originally developed as a part of the <a class="reference external" href="https://github.com/bnelair/best-toolbox">BEhavioral STate Analysis Toolbox (BEST)</a> project. However, the development has transferred to the BrainMaze project.</p>
+<div class="admonition warning">
+<p class="admonition-title">Warning</p>
+<p><strong>DEPRECATED: brainmaze-torch is retired. Use</strong> <a class="reference external" href="https://github.com/bnelair/brainmaze-eeg-models">brainmaze-eeg-models</a>
+<strong>instead</strong> (<code class="docutils literal notranslate"><span class="pre">pip</span> <span class="pre">install</span> <span class="pre">brainmaze-eeg-models</span></code>, <code class="docutils literal notranslate"><span class="pre">import</span> <span class="pre">brainmaze_eeg_models.seizure</span></code>).</p>
+<p>Version 0.3.0 is the <strong>final release</strong>: a compatibility shim. It no longer contains PyTorch code or
+model weights and no longer installs <code class="docutils literal notranslate"><span class="pre">torch</span></code>; it depends on brainmaze-eeg-models and re-exports its
+seizure-detection functions, which run the same models on ONNX Runtime. Importing <code class="docutils literal notranslate"><span class="pre">brainmaze_torch</span></code>
+emits a <code class="docutils literal notranslate"><span class="pre">FutureWarning</span></code> (shown by default, so that everyone still using it sees the notice).
+<strong>The GitHub repository will be archived (read-only) after this release</strong>: there will be no further
+releases, fixes or support here. Please open issues and pull requests in <a class="reference external" href="https://github.com/bnelair/brainmaze-eeg-models">brainmaze-eeg-models</a>.</p>
+<p>Migration notes: <a class="reference external" href="https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch">https://bnelair.github.io/brainmaze-eeg-models/seizure.html#moving-from-brainmaze-torch</a></p>
+</div>
 </section>
-<section id="documentation">
-<h1>Documentation<a class="headerlink" href="#documentation" title="Link to this heading">#</a></h1>
-<p>Documentation is available <a class="reference external" href="https://bnelair.github.io/brainmaze-torch/">here</a>.</p>
+<section id="migrating-to-brainmaze-eeg-models">
+<h1>Migrating to brainmaze-eeg-models<a class="headerlink" href="#migrating-to-brainmaze-eeg-models" title="Link to this heading">#</a></h1>
+<p>Change the import; the function names, arguments and outputs are the same:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># before (brainmaze-torch)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_torch.seizure_detection</span><span class="w"> </span><span class="kn">import</span> <span class="n">predict_channel_seizure_probability</span>
+<span class="c1"># after (brainmaze-eeg-models)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_eeg_models.seizure</span><span class="w"> </span><span class="kn">import</span> <span class="n">predict_channel_seizure_probability</span>
+
+<span class="n">t</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">predict_channel_seizure_probability</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s1">'modelA'</span><span class="p">)</span>   <span class="c1"># unchanged call</span>
+</pre></div>
+</div>
+<div class="pst-scrollable-table-container"><table class="table" id="id4">
+<caption><span class="caption-text">brainmaze-torch 0.2.0 -&gt; brainmaze-eeg-models (and what the 0.3.0 shim does)</span><a class="headerlink" href="#id4" title="Link to this table">#</a></caption>
+<colgroup>
+<col style="width: 34.0%" />
+<col style="width: 33.0%" />
+<col style="width: 33.0%" />
+</colgroup>
+<thead>
+<tr class="row-odd"><th class="head"><p>brainmaze-torch 0.2.0</p></th>
+<th class="head"><p>brainmaze-eeg-models</p></th>
+<th class="head"><p>notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_torch.seizure_detection.predict_channel_seizure_probability</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure.predict_channel_seizure_probability</span></code></p></td>
+<td><p>same signature and output (also positional <code class="docutils literal notranslate"><span class="pre">use_cuda</span></code>, <code class="docutils literal notranslate"><span class="pre">cuda_number</span></code>); CPU by default as in
+0.2.0; new keyword <code class="docutils literal notranslate"><span class="pre">device='cpu'</span> <span class="pre">|</span> <span class="pre">'cuda'</span> <span class="pre">|</span> <span class="pre">'auto'</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection.preprocess_input</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure.preprocess_input</span></code></p></td>
+<td><p>identical code and output</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection.infer_seizure_probability</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure.infer_seizure_probability</span></code></p></td>
+<td><p>same; <code class="docutils literal notranslate"><span class="pre">model</span></code> may also be a name (default <code class="docutils literal notranslate"><span class="pre">'modelA'</span></code>); a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code> raises <code class="docutils literal notranslate"><span class="pre">TypeError</span></code></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection.load_trained_model('modelA'</span> <span class="pre">|</span> <span class="pre">'modelB')</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure.load_trained_model</span></code></p></td>
+<td><p>returns an <code class="docutils literal notranslate"><span class="pre">OnnxModel</span></code> (not a <code class="docutils literal notranslate"><span class="pre">torch.nn.Module</span></code>); new <code class="docutils literal notranslate"><span class="pre">device</span></code> (default <code class="docutils literal notranslate"><span class="pre">'cpu'</span></code>),
+<code class="docutils literal notranslate"><span class="pre">threads</span></code>, <code class="docutils literal notranslate"><span class="pre">cuda_device_id</span></code></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection._models.TRAINED_MODELS</span></code></p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure.TRAINED_MODELS</span></code></p></td>
+<td><p>same keys; values are now <code class="docutils literal notranslate"><span class="pre">(onnx_file,</span> <span class="pre">sha256)</span></code> instead of the <code class="docutils literal notranslate"><span class="pre">.pt</span></code> file name</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection._seizure_detect</span></code> (module path)</p></td>
+<td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_eeg_models.seizure</span></code></p></td>
+<td><p>the four functions and <code class="docutils literal notranslate"><span class="pre">N_FREQ_BINS</span></code>, <code class="docutils literal notranslate"><span class="pre">MIN_FS</span></code>, <code class="docutils literal notranslate"><span class="pre">SEIZURE_CLASS_INDEX</span></code> still import from the old path</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="docutils literal notranslate"><span class="pre">...seizure_detection._models.SeizureDetectModel</span></code> (PyTorch class), <code class="docutils literal notranslate"><span class="pre">_ModelsSeizureDetect</span></code>,
+<code class="docutils literal notranslate"><span class="pre">_MODEL_DIR</span></code>, the <code class="docutils literal notranslate"><span class="pre">.pt</span></code> weights</p></td>
+<td><p>none (the ONNX export of the same weights ships with brainmaze-eeg-models)</p></td>
+<td><p>raise <code class="docutils literal notranslate"><span class="pre">ImportError</span></code> with migration advice; <code class="docutils literal notranslate"><span class="pre">hasattr</span></code> / <code class="docutils literal notranslate"><span class="pre">getattr(module,</span> <span class="pre">name,</span> <span class="pre">default)</span></code> on
+these names raise too (instead of returning False / the default)</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="docutils literal notranslate"><span class="pre">brainmaze_torch.models_generic</span></code> (<code class="docutils literal notranslate"><span class="pre">ResLayer1D</span></code>, <code class="docutils literal notranslate"><span class="pre">ResLayer2D</span></code>, <code class="docutils literal notranslate"><span class="pre">Attention1D_MIL</span></code>)</p></td>
+<td><p>none: generic PyTorch training building blocks; brainmaze-eeg-models is inference only</p></td>
+<td><p>importing the module raises <code class="docutils literal notranslate"><span class="pre">ImportError</span></code>; copy the classes from the
+<a class="reference external" href="https://github.com/bnelair/brainmaze-torch/blob/v0.2.0/brainmaze_torch/models_generic.py">0.2.0 source</a>
+or pin <code class="docutils literal notranslate"><span class="pre">brainmaze-torch==0.2.0</span></code></p></td>
+</tr>
+</tbody>
+</table>
+</div>
+<p><strong>One 0.2.0 pattern now raises</strong> <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> (loudly, never silently): loading a model and then
+asking for the GPU per call,</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">load_trained_model</span><span class="p">(</span><span class="s1">'modelA'</span><span class="p">)</span>                                <span class="c1"># 0.2.0: always a CPU model</span>
+<span class="n">predict_channel_seizure_probability</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">use_cuda</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>    <span class="c1"># 0.2.0: ran on cuda:0; now ValueError</span>
+</pre></div>
+</div>
+<p>An ONNX Runtime session cannot move between devices. Choose the device when loading, or pass the
+model name:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">m</span> <span class="o">=</span> <span class="n">load_trained_model</span><span class="p">(</span><span class="s1">'modelA'</span><span class="p">,</span> <span class="n">device</span><span class="o">=</span><span class="s1">'cuda'</span><span class="p">,</span> <span class="n">cuda_device_id</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>   <span class="c1"># GPU k: cuda_device_id=k</span>
+<span class="n">predict_channel_seizure_probability</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">m</span><span class="p">)</span>
+<span class="c1"># or</span>
+<span class="n">predict_channel_seizure_probability</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="s1">'modelA'</span><span class="p">,</span> <span class="n">use_cuda</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">cuda_number</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Numbers: the ONNX models are exported from the 0.2.0 weights and give the same probabilities as
+PyTorch to float32 rounding (typically ~1e-6, at most ~2e-5), with identical NaN masks; the golden
+tests of this repository (outputs of the published 0.1.1 code, tolerance 1e-4) pass unchanged on the
+shim. For a GPU, install <code class="docutils literal notranslate"><span class="pre">onnxruntime-gpu</span></code> in place of <code class="docutils literal notranslate"><span class="pre">onnxruntime</span></code> as described in the
+<a class="reference external" href="https://github.com/bnelair/brainmaze-eeg-models#nvidia-gpu">brainmaze-eeg-models README</a>.</p>
+<p>Silencing the warning while you migrate (better: migrate):</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+<span class="n">warnings</span><span class="o">.</span><span class="n">filterwarnings</span><span class="p">(</span><span class="s2">"ignore"</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">"brainmaze-torch is retired"</span><span class="p">,</span> <span class="n">category</span><span class="o">=</span><span class="ne">FutureWarning</span><span class="p">)</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">brainmaze_torch.seizure_detection</span>          <span class="c1"># the filter must be set before the first import</span>
+</pre></div>
+</div>
 </section>
 <section id="installation">
 <h1>Installation<a class="headerlink" href="#installation" title="Link to this heading">#</a></h1>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>brainmaze-torch
+<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>brainmaze-eeg-models<span class="w">        </span><span class="c1"># recommended: the successor</span>
+pip<span class="w"> </span>install<span class="w"> </span>-U<span class="w"> </span>brainmaze-torch<span class="w">          </span><span class="c1"># only to keep old code running (0.3.0 shim, no torch)</span>
 </pre></div>
 </div>
-<p>Requirements: Python &gt;= 3.10, <code class="docutils literal notranslate"><span class="pre">numpy</span> <span class="pre">&gt;=</span> <span class="pre">1.24</span></code> (1.24, 1.26 and 2.x are tested), <code class="docutils literal notranslate"><span class="pre">scipy</span> <span class="pre">&gt;=</span> <span class="pre">1.10</span></code> and
-<code class="docutils literal notranslate"><span class="pre">torch</span> <span class="pre">&gt;=</span> <span class="pre">2.3</span></code> (older torch wheels cannot use numpy 2: <code class="docutils literal notranslate"><span class="pre">torch.from_numpy</span></code> fails with “Numpy is not
-available”). The CPU build of PyTorch is sufficient; CUDA is optional.</p>
+<p>Requirements: Python &gt;= 3.10 and <code class="docutils literal notranslate"><span class="pre">brainmaze-eeg-models</span> <span class="pre">&gt;=</span> <span class="pre">0.1.0</span></code> (which brings <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code>,
+<code class="docutils literal notranslate"><span class="pre">onnxruntime</span></code> and <code class="docutils literal notranslate"><span class="pre">brainmaze-utils</span></code>). Upgrading from 0.2.0 removes the bundled <code class="docutils literal notranslate"><span class="pre">.pt</span></code> weights but
+leaves an installed <code class="docutils literal notranslate"><span class="pre">torch</span></code> in place; uninstall it yourself if nothing else needs it. Projects that
+need the PyTorch implementation itself can pin <code class="docutils literal notranslate"><span class="pre">brainmaze-torch==0.2.0</span></code> (<code class="docutils literal notranslate"><span class="pre">torch</span> <span class="pre">&gt;=</span> <span class="pre">2.3</span></code>); it stays
+on PyPI but is not maintained.</p>
 </section>
-<section id="seizure-probability-quick-start">
-<h1>Seizure probability: quick start<a class="headerlink" href="#seizure-probability-quick-start" title="Link to this heading">#</a></h1>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">brainmaze_torch.seizure_detection</span><span class="w"> </span><span class="kn">import</span> <span class="n">predict_channel_seizure_probability</span>
-
-<span class="n">fs</span> <span class="o">=</span> <span class="mi">500</span>                                  <span class="c1"># Hz; whole, even number &gt;= 200 (500.0 is fine)</span>
-<span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">fs</span> <span class="o">*</span> <span class="mi">600</span><span class="p">)</span>             <span class="c1"># one channel, 10 min; NaN marks missing data</span>
-<span class="n">t</span><span class="p">,</span> <span class="n">p</span> <span class="o">=</span> <span class="n">predict_channel_seizure_probability</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">fs</span><span class="p">,</span> <span class="n">model</span><span class="o">=</span><span class="s1">'modelA'</span><span class="p">)</span>
-<span class="c1"># t[k] = k * 0.5 s; p[k] = seizure probability of the 1 s of signal centred on t[k]</span>
-</pre></div>
-</div>
-<p>What the output means:</p>
+<section id="history">
+<h1>History<a class="headerlink" href="#history" title="Link to this heading">#</a></h1>
 <ul class="simple">
-<li><p>One value every 0.5 s, <code class="docutils literal notranslate"><span class="pre">len(p)</span> <span class="pre">==</span> <span class="pre">len(x)</span> <span class="pre">//</span> <span class="pre">(fs</span> <span class="pre">//</span> <span class="pre">2)</span></code>. The whole recording is covered, including its
-start and end.</p></li>
-<li><p><strong>NaN means “not evaluated”, never “no seizure”.</strong> <code class="docutils literal notranslate"><span class="pre">p</span></code> is NaN at <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">=</span> <span class="pre">0</span></code> and for every 1 s segment that
-contains a NaN/inf sample (a gap) or a flat signal (e.g. a disconnected channel); every other segment has a
-value. Use <code class="docutils literal notranslate"><span class="pre">np.nanmax</span></code> / <code class="docutils literal notranslate"><span class="pre">np.isfinite</span></code> downstream, and do not replace NaN by 0.</p></li>
-<li><p>Wherever version 0.1.1 produced an estimate, the values are identical (pinned by golden-value tests against
-0.1.1’s output). Inside an evaluated window, gap samples are zero-filled for the model as before, so valid
-data right next to a long gap can be influenced by it; <code class="docutils literal notranslate"><span class="pre">min_valid_fraction</span> <span class="pre">&gt;</span> <span class="pre">0</span></code> prefers windows with more
-valid data there (this changes values next to long gaps and is not validated).</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">fs</span></code> must be a whole, even number of Hz and at least 200 Hz. Other rates raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>; resample first
-(e.g. <code class="docutils literal notranslate"><span class="pre">scipy.signal.resample_poly</span></code>). Anti-aliasing is up to the caller. These rules come from the spectrogram
-grid (1 s segments, 0.5 s hop, 100 one-Hz bins), not from the training data.</p></li>
-<li><p>At 200-256 Hz the anti-alias filter of the amplifier or resampler usually attenuates the top bins (from about
-0.4 x fs, i.e. 80-100 Hz). The model did not see such spectra in training, so this is a silent domain shift;
-prefer higher rates.</p></li>
-<li><p>The recording must be at least <code class="docutils literal notranslate"><span class="pre">window_s</span></code> (default 300 s) long, and <code class="docutils literal notranslate"><span class="pre">step_s</span></code> must not exceed
-<code class="docutils literal notranslate"><span class="pre">window_s</span> <span class="pre">-</span> <span class="pre">2</span> <span class="pre">*</span> <span class="pre">discard_edges_s</span> <span class="pre">-</span> <span class="pre">0.5</span></code>; otherwise a <code class="docutils literal notranslate"><span class="pre">ValueError</span></code> explains what to change.</p></li>
+<li><p><strong>0.3.0</strong> (final): compatibility shim over brainmaze-eeg-models (see above); <code class="docutils literal notranslate"><span class="pre">torch</span></code> and the <code class="docutils literal notranslate"><span class="pre">.pt</span></code>
+models removed; the repository is archived after this release.</p></li>
+<li><p><strong>0.2.0</strong>: NaN for unevaluated time, full coverage of the recording, stricter input validation,
+dependencies reduced to <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code>, <code class="docutils literal notranslate"><span class="pre">torch</span> <span class="pre">&gt;=</span> <span class="pre">2.3</span></code>. Details:
+<a class="reference external" href="https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md">RELEASING.md</a>.</p></li>
 </ul>
-<p>See the <a class="reference external" href="https://bnelair.github.io/brainmaze-torch/">documentation</a> for the low-level API
-(<code class="docutils literal notranslate"><span class="pre">preprocess_input</span></code>, <code class="docutils literal notranslate"><span class="pre">infer_seizure_probability</span></code>) and the details of the time grid.</p>
-</section>
-<section id="changes-since-0-1-1-breaking-the-next-release-is-0-2-0">
-<h1>Changes since 0.1.1 (breaking; the next release is &gt;= 0.2.0)<a class="headerlink" href="#changes-since-0-1-1-breaking-the-next-release-is-0-2-0" title="Link to this heading">#</a></h1>
-<ul class="simple">
-<li><p><code class="docutils literal notranslate"><span class="pre">predict_channel_seizure_probability</span></code> returns <strong>NaN</strong> at <code class="docutils literal notranslate"><span class="pre">t</span> <span class="pre">=</span> <span class="pre">0</span></code> and for gap / flat 1 s segments
-(0.1.1: a number, or 0 where nothing was evaluated). Use NaN-aware functions; never <code class="docutils literal notranslate"><span class="pre">fillna(0)</span></code>.</p></li>
-<li><p>The output has <code class="docutils literal notranslate"><span class="pre">len(x)</span> <span class="pre">//</span> <span class="pre">(fs</span> <span class="pre">//</span> <span class="pre">2)</span></code> points: one fewer than 0.1.1 when the recording is not a whole number of
-half-seconds (that last point lay beyond the data and was always 0).</p></li>
-<li><p>The recording edges and the tail after the last regular window now get values (0.1.1: 0). Wherever 0.1.1
-produced an estimate the values are unchanged.</p></li>
-<li><p><code class="docutils literal notranslate"><span class="pre">fs</span></code> must be a whole, even number &gt;= 200 Hz; <code class="docutils literal notranslate"><span class="pre">discard_edges_s</span> <span class="pre">==</span> <span class="pre">window_s</span></code>, a <code class="docutils literal notranslate"><span class="pre">step_s</span></code> that would leave
-uncovered time, and recordings shorter than <code class="docutils literal notranslate"><span class="pre">window_s</span></code> raise <code class="docutils literal notranslate"><span class="pre">ValueError</span></code>.</p></li>
-<li><p>New keyword arguments <code class="docutils literal notranslate"><span class="pre">min_valid_fraction</span></code> (default 0.0 = 0.1.1 behaviour) and <code class="docutils literal notranslate"><span class="pre">fill_recording_edges</span></code>.</p></li>
-<li><p>Dependencies reduced to <code class="docutils literal notranslate"><span class="pre">numpy</span></code>, <code class="docutils literal notranslate"><span class="pre">scipy</span></code> and <code class="docutils literal notranslate"><span class="pre">torch</span> <span class="pre">&gt;=</span> <span class="pre">2.3</span></code>; packages that 0.1.1 pulled in transitively
-(<code class="docutils literal notranslate"><span class="pre">brainmaze_utils</span></code>, <code class="docutils literal notranslate"><span class="pre">torchvision</span></code>, <code class="docutils literal notranslate"><span class="pre">torchaudio</span></code>, <code class="docutils literal notranslate"><span class="pre">pandas</span></code>, …) must be required by your own project if
-you use them. The private <code class="docutils literal notranslate"><span class="pre">brainmaze_torch._config</span></code> module was removed.</p></li>
-</ul>
-<p>Details: <a class="reference external" href="https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md">RELEASING.md</a>.</p>
-</section>
-<section id="how-to-contribute">
-<h1>How to contribute<a class="headerlink" href="#how-to-contribute" title="Link to this heading">#</a></h1>
-<p>The project has 2 main protected branches <em>main</em> that contains official software releases and <em>dev</em> that contains the latest feature implementations shared with developers.
-To implement a new feature a new branch should be created from the <em>dev</em> branch with name pattern of <em>developer_identifier/feature_name</em>.</p>
-<p>After the feature is implemented, a pull request can be created to merge the feature branch into the <em>dev</em> branch with. Pull requests need to be reviewed by the code owners.
-Releasing
-‘’’’’’’’’’’’’’’’’’’’’’’’’’’’’’’</p>
-<p>Releases are automated and never bypass branch protection. To cut a release, a code owner runs the <strong>Prepare release</strong> GitHub Action (<em>Actions</em> tab, <code class="docutils literal notranslate"><span class="pre">workflow_dispatch</span></code>) and selects the bump (<em>patch</em> / <em>minor</em> / <em>major</em>). This opens a small <code class="docutils literal notranslate"><span class="pre">Release</span> <span class="pre">vX.Y.Z</span></code> pull request that bumps <code class="docutils literal notranslate"><span class="pre">[project].version</span></code> in <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> on a <code class="docutils literal notranslate"><span class="pre">release/bump-*</span></code> branch off <em>main</em>. Once a code owner approves and merges that pull request into <em>main</em>, the <strong>Release</strong> workflow runs the tests, builds the distributions, publishes them to PyPI (org API token <code class="docutils literal notranslate"><span class="pre">PYPI_Token_General</span></code>), and then tags the version and creates the GitHub release. <code class="docutils literal notranslate"><span class="pre">pyproject.toml</span></code> is the single source of truth for the version.</p>
-<p>Promotion of features from <em>dev</em> to <em>main</em> is independent of releases and <strong>must not change</strong> <code class="docutils literal notranslate"><span class="pre">[project].version</span></code>: a <em>Version guard</em> CI check flags any pull request outside the release flow that edits it. The check is advisory (no ruleset requires it), so reviewers must not merge a pull request it flags.</p>
-<p>See <a class="reference external" href="RELEASING.md">RELEASING.md</a> for the step-by-step guide and publishing credentials and recovery.</p>
-<section id="building-the-documentation">
-<h2>Building the documentation<a class="headerlink" href="#building-the-documentation" title="Link to this heading">#</a></h2>
-<p>New functions need numpy-style docstrings (rendered by Sphinx with <code class="docutils literal notranslate"><span class="pre">napoleon</span></code>). The documentation is built from <code class="docutils literal notranslate"><span class="pre">docs_src/</span></code> and published to GitHub Pages by the <strong>Docs</strong> workflow (<code class="docutils literal notranslate"><span class="pre">main</span></code> at the site root, <code class="docutils literal notranslate"><span class="pre">dev</span></code> under <code class="docutils literal notranslate"><span class="pre">/dev/</span></code>). To build it locally:</p>
-<div class="highlight-bash notranslate"><div class="highlight"><pre><span></span>pip<span class="w"> </span>install<span class="w"> </span>-r<span class="w"> </span>docs_src/requirements.txt<span class="w"> </span>-e<span class="w"> </span>.
-sphinx-build<span class="w"> </span>-b<span class="w"> </span>html<span class="w"> </span>docs_src/source<span class="w"> </span>docs
-</pre></div>
-</div>
-<p><code class="docutils literal notranslate"><span class="pre">docs/</span></code> is ignored by git and must not be committed.</p>
+<p>This project was originally developed as a part of the <a class="reference external" href="https://github.com/bnelair/best-toolbox">BEhavioral STate Analysis Toolbox (BEST)</a> project; development then moved to the BrainMaze project and,
+for the trained models, to brainmaze-eeg-models.</p>
+<section id="releasing">
+<h2>Releasing<a class="headerlink" href="#releasing" title="Link to this heading">#</a></h2>
+<p>0.3.0 is the final release (see <a class="reference external" href="https://github.com/bnelair/brainmaze-torch/blob/main/RELEASING.md">RELEASING.md</a>):
+a code owner runs <strong>Prepare release</strong> (<em>minor</em>: 0.2.0 -&gt; 0.3.0) and merges the <code class="docutils literal notranslate"><span class="pre">Release</span> <span class="pre">v0.3.0</span></code> pull
+request; the <strong>Release</strong> workflow tests, builds, publishes to PyPI (org API token <code class="docutils literal notranslate"><span class="pre">PYPI_Token_General</span></code>),
+tags and creates the GitHub release. The repository is archived afterwards.</p>
 </section>
 </section>
 <section id="license">
@@ -497,7 +542,7 @@ sphinx-build<span class="w"> </span>-b<span class="w"> </span>html<span class="w
 </section>
 <section id="acknowledgment">
 <h1>Acknowledgment<a class="headerlink" href="#acknowledgment" title="Link to this heading">#</a></h1>
-<p>This code was developed and originally published for the first time by (Mivalt 2022, and Sladky 2022). Additionally, codes related to individual projects available in this repository are stated below. When using this toolbox, we appreciate you citing the papers related to the utilized functionality. Please, see the sections below for references to individual submodules.</p>
+<p>This code was developed and originally published for the first time by (Mivalt 2022, and Sladky 2022). Additionally, codes related to individual projects available in this repository are stated below. When using these models (now in brainmaze-eeg-models), we appreciate you citing the papers related to the utilized functionality. Please, see the sections below for references to individual submodules.</p>
 <blockquote>
 <div><div class="line-block">
 <div class="line">F. Mivalt et V. Kremen et al., “Electrical brain stimulation and continuous behavioral state tracking in ambulatory humans,” J. Neural Eng., vol. 19, no. 1, p. 016019, Feb. 2022, doi: 10.1088/1741-2552/ac4bfd.</div>
@@ -555,12 +600,10 @@ sphinx-build<span class="w"> </span>-b<span class="w"> </span>html<span class="w
   <nav id="pst-page-toc-nav" class="page-toc" aria-labelledby="pst-page-navigation-heading-2">
     <ul class="pst-show_toc_level nav section-nav flex-column">
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#">BrainMaze: Brain Electrophysiology, Behavior and Dynamics Analysis Toolbox - Torch</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#documentation">Documentation</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#migrating-to-brainmaze-eeg-models">Migrating to brainmaze-eeg-models</a></li>
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#installation">Installation</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#seizure-probability-quick-start">Seizure probability: quick start</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#changes-since-0-1-1-breaking-the-next-release-is-0-2-0">Changes since 0.1.1 (breaking; the next release is &gt;= 0.2.0)</a></li>
-<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#how-to-contribute">How to contribute</a><ul class="pst-show_toc_level nav section-nav flex-column">
-<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#building-the-documentation">Building the documentation</a></li>
+<li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#history">History</a><ul class="pst-show_toc_level nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#releasing">Releasing</a></li>
 </ul>
 </li>
 <li class="toc-h1 nav-item toc-entry"><a class="reference internal nav-link" href="#license">License</a></li>
